@@ -1,0 +1,56 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "dev.markpin/mcp",
+  "title": "Markpin",
+  "description": "Search and read the web pages and highlights you saved with the Markpin Chrome extension.",
+  "websiteUrl": "https://markpin.dev",
+  "icons": [
+    {
+      "src": "https://markpin.dev/icon-180.png",
+      "mimeType": "image/png",
+      "sizes": [
+        "180x180"
+      ]
+    }
+  ],
+  "repository": {
+    "url": "https://github.com/mud-studio/markpin-mcp",
+    "source": "github",
+    "subfolder": "mcp-server"
+  },
+  "version": "0.7.1",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@markpin/mcp",
+      "version": "0.7.1",
+      "transport": {
+        "type": "stdio"
+      },
+      "packageArguments": [
+        {
+          "type": "named",
+          "name": "--dir",
+          "description": "Your Markpin folder (the one that contains pages/): a local folder or the Google Drive for Desktop mirror.",
+          "format": "filepath",
+          "isRequired": true,
+          "placeholder": "~/Documents/Markpin"
+        },
+        {
+          "type": "named",
+          "name": "--lang",
+          "description": "Language of the confirmation dialog. Defaults to the system locale.",
+          "choices": [
+            "en",
+            "ko",
+            "ja",
+            "es",
+            "pt-BR",
+            "de",
+            "fr"
+          ]
+        }
+      ]
+    }
+  ]
+}

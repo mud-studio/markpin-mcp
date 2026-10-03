@@ -1,0 +1,55 @@
+{
+  "name": "@markpin/mcp",
+  "version": "0.7.1",
+  "description": "MCP server over a Markpin folder: search and read your saved pages, optionally edit them with confirmation",
+  "mcpName": "dev.markpin/mcp",
+  "type": "module",
+  "license": "MIT",
+  "homepage": "https://markpin.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mud-studio/markpin-mcp.git",
+    "directory": "mcp-server"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "markpin",
+    "markdown",
+    "bookmarks",
+    "claude"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "bin": {
+    "markpin-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "yarn build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@mozilla/readability": "^0.6.0",
+    "jsdom": "^26.1.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@markpin/shared": "workspace:*",
+    "@types/jsdom": "^21.1.7",
+    "@types/node": "^24.0.14",
+    "tsup": "^8.5.1",
+    "typescript": "^5.5.3",
+    "vitest": "^2.1.0"
+  },
+  "engines": {
+    "node": ">=20.1.0"
+  }
+}
