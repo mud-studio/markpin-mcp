@@ -1,0 +1,25 @@
+{
+  "$schema": "https://glama.ai/mcp/schemas/server.json",
+  "maintainers": [
+    "gyofeel"
+  ],
+  "name": "markpin-mcp",
+  "title": "Markpin",
+  "description": "Search and read the web pages, highlights and notes you saved with the Markpin Chrome extension, kept as local Markdown files.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mud-studio/markpin-mcp"
+  },
+  "homepage": "https://markpin.dev",
+  "transport": "stdio",
+  "dockerfile": "glama/Dockerfile",
+  "tags": [
+    "mcp",
+    "markdown",
+    "obsidian",
+    "highlights",
+    "web-clipper",
+    "bookmarks",
+    "local"
+  ]
+}

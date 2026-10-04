@@ -6,6 +6,7 @@ Usage and setup: [mcp-server/README.md](mcp-server/README.md).
 
 - `mcp-server/` — the server (stdio, read-only unless `--allow-write`).
 - `shared/` — the Markpin file format (parse/serialize), also used by the extension. Bundled into the npm package.
+- `glama.json`, `glama/Dockerfile` — for the [Glama](https://glama.ai/mcp/servers) directory only.
 
 This repository is published from Markpin's main repository on every release, so pull requests are applied there by hand. Issues are welcome here.
 
