@@ -1,6 +1,6 @@
 {
   "name": "@markpin/mcp",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "description": "MCP server over a Markpin folder: search and read your saved pages, optionally edit them with confirmation",
   "mcpName": "dev.markpin/mcp",
   "type": "module",

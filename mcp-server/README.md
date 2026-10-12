@@ -137,16 +137,17 @@ Write (`--allow-write`):
 |---|---|
 | `save_page` | Saves a URL as a new page (fetches and extracts the article unless you pass `content`). Takes an optional `summary` (one or two sentences) and `tags` — the assistant is asked to supply both whenever it has read the page, since Markpin's built-in AI only runs for pages saved from the browser. One page per URL — an existing page is returned unchanged. |
 | `update_tags` | Adds and/or removes tags on one or more pages. |
-| `add_clip` | Adds a quoted text clip, with an optional note and highlight `color` (amber, green, blue, pink), to a page. |
+| `add_clip` | Adds a quoted text clip, with an optional note, highlight `color` (amber, green, blue, pink) and reaction mark `kind` (question, insight, disagree, star), to a page. |
 | `set_clip_note` | Replaces the note on a clip (empty clears it). |
 | `set_summary` | Replaces a page's summary (empty clears it). Handy for pages saved without one. |
+| `set_note` | Sets the reader's own one-line note on a page (frontmatter `note`; empty clears it). |
 | `delete_pages` | Marks pages deleted. The Markpin extension keeps them for 30 days and can restore them; this server never deletes files. |
 | `restore_pages` | Brings back pages deleted within the last 30 days. |
 | `set_bookmark` | Puts the reading bookmark on a page — from the start, or at a `quote` from the content to resume there. Replaces any existing bookmark and clears the read mark. |
 | `clear_bookmark` | Removes the bookmark without marking the page read. |
 | `mark_read` | Marks a page as read and removes its bookmark. |
 
-Every write returns a `note` and a `gate` field (`"elicitation"` when you confirmed in the dialog, `"client"` when only the client's prompt stood between the assistant and the write). `update_tags`, `set_clip_note` and `set_summary` also return `before`/`after`; the others return the affected page(s).
+Every write returns a `note` and a `gate` field (`"elicitation"` when you confirmed in the dialog, `"client"` when only the client's prompt stood between the assistant and the write). `update_tags`, `set_clip_note`, `set_summary` and `set_note` also return `before`/`after`; the others return the affected page(s).
 
 ## Limits
 

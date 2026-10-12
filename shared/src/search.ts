@@ -1,9 +1,9 @@
 import MiniSearch from 'minisearch';
 import type { Page } from './types';
 
-export type PageDoc = { id: string; title: string; contentText: string; clipsText: string; tagsText: string };
+export type PageDoc = { id: string; title: string; contentText: string; clipsText: string; tagsText: string; noteText: string };
 
-const FIELDS: (keyof PageDoc)[] = ['title', 'contentText', 'clipsText', 'tagsText'];
+const FIELDS: (keyof PageDoc)[] = ['title', 'contentText', 'clipsText', 'tagsText', 'noteText'];
 
 export function toDoc(page: Page): PageDoc {
   return {
@@ -11,7 +11,8 @@ export function toDoc(page: Page): PageDoc {
     title: page.title,
     contentText: page.contentText ?? '',
     clipsText: page.clips.map((c) => `${c.text}\n${c.note}`).join('\n'),
-    tagsText: page.tags.join(' ')
+    tagsText: page.tags.join(' '),
+    noteText: page.note ?? ''
   };
 }
 

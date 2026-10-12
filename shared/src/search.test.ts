@@ -12,18 +12,21 @@ describe('toDoc / buildIndex', () => {
   const pages = [
     mk('a', { title: 'React 상태 관리', tags: ['react'], contentText: 'zustand 와 immer' }),
     mk('bb', { title: 'Postgres 인덱스', tags: ['db'], clips: [{ id: 'c', type: 'text', createdAt: '', updatedAt: '', text: 'B-tree 설명', note: '복습', selectors: [] }] }),
-    mk('ccc', { title: '요리법', tags: ['life', 'react'] })
+    mk('ccc', { title: '요리법', tags: ['life', 'react'], note: '주말 되새김' })
   ];
   const index = buildIndex(pages);
   const ids = (q: string) => index.search(q).map((r) => r.id as string);
 
   it('flattens clips and tags into searchable fields', () => {
-    expect(toDoc(pages[1])).toEqual({ id: 'bb', title: 'Postgres 인덱스', contentText: '', clipsText: 'B-tree 설명\n복습', tagsText: 'db' });
+    expect(toDoc(pages[1])).toEqual({ id: 'bb', title: 'Postgres 인덱스', contentText: '', clipsText: 'B-tree 설명\n복습', tagsText: 'db', noteText: '' });
   });
   it('matches title, content, clip text and note', () => {
     expect(ids('zustand')).toEqual(['a']);
     expect(ids('B-tree')).toEqual(['bb']);
     expect(ids('복습')).toEqual(['bb']);
+  });
+  it('matches the reader note (§21.5)', () => {
+    expect(ids('되새김')).toEqual(['ccc']);
   });
   it('matches korean prefix', () => {
     expect(ids('상태')).toEqual(['a']);

@@ -10,6 +10,8 @@ describe('confirmMessage', () => {
     expect(confirmMessage('ko', { kind: 'add_clip', title: 'A', text: 'x'.repeat(50) })).toBe(`'A'에 클립 "${'x'.repeat(40)}…"을 추가할까요?`);
     expect(confirmMessage('ko', { kind: 'set_clip_note', title: 'A', note: '' })).toBe("'A'의 클립 메모를 지울까요?");
     expect(confirmMessage('ko', { kind: 'set_clip_note', title: 'A', note: 'm' })).toBe("'A'의 클립 메모를 \"m\"으로 바꿀까요?");
+    expect(confirmMessage('ko', { kind: 'set_note', title: 'A', note: '' })).toBe("'A'의 한 줄을 지울까요?");
+    expect(confirmMessage('ko', { kind: 'set_note', title: 'A', note: 'n' })).toBe("'A'의 한 줄을 \"n\"으로 바꿀까요?");
     expect(confirmMessage('ko', { kind: 'set_summary', title: 'A', summary: '' })).toBe("'A'의 요약을 지울까요?");
     expect(confirmMessage('ko', { kind: 'set_summary', title: 'A', summary: 's' })).toBe("'A'의 요약을 \"s\"으로 바꿀까요?");
     expect(confirmMessage('ko', { kind: 'delete_pages', titles: ['A', 'B', 'C', 'D', 'E'] })).toBe("'A', 'B', 'C' 외 2개를 삭제할까요? (30일 안에 복구 가능)");
@@ -77,6 +79,8 @@ describe('confirmMessage', () => {
       { kind: 'set_clip_note', title: 'T', note: '' },
       { kind: 'set_summary', title: 'T', summary: 's' },
       { kind: 'set_summary', title: 'T', summary: '' },
+      { kind: 'set_note', title: 'T', note: 'n' },
+      { kind: 'set_note', title: 'T', note: '' },
       { kind: 'delete_pages', titles: ['T'] },
       { kind: 'restore_pages', titles: ['T'] },
       { kind: 'set_bookmark', title: 'T' },

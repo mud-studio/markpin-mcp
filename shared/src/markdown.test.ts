@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MAX_FILE_BYTES, exceedsFileLimit, fitContentToFile, parsePage, serializePage } from './markdown';
 import { TEMPLATE_DEFAULT, TEMPLATE_OBSIDIAN } from './presets';
-import { clipColorOf, type Clip, type Page } from './types';
+import { clipColorOf, clipKindOf, normalizeNote, type Clip, type Page } from './types';
 
 const base: Page = {
   id: '5f1c2a3b-1111-2222-3333-444444444444',
@@ -105,6 +105,13 @@ describe('serializePage', () => {
     const md = serializePage({ ...base, summary: '요약', readAt: '2026-09-30T02:00:00.000Z', deletedAt: '2026-10-01T00:00:00.000Z', bookmark: { createdAt: '2026-09-30T01:00:00.000Z' }, contentTruncated: true });
     expect(fmKeys(md)).toEqual(['title', 'url', 'savedAt', 'tags', 'summary', 'readAt', 'deletedAt']);
     expect(Object.keys(blockOf(md))).toEqual(['v', 'id', 'rev', 'updatedAt', 'domain', 'clips', 'bookmark', 'contentTruncated']);
+  });
+
+  it('writes the reader note after summary and omits an empty one (§21.5)', () => {
+    const md = serializePage({ ...base, summary: '요약', note: '내 한 줄', readAt: '2026-09-30T02:00:00.000Z' });
+    expect(fmKeys(md)).toEqual(['title', 'url', 'savedAt', 'tags', 'summary', 'note', 'readAt']);
+    expect(md).toContain('\nsummary: 요약\nnote: 내 한 줄\nreadAt: ');
+    expect(fmKeys(serializePage({ ...base, note: '' }))).toEqual(['title', 'url', 'savedAt', 'tags']);
   });
 
   it('truncates content over MAX_FILE_BYTES and flags it', () => {
@@ -217,6 +224,21 @@ describe('parsePage', () => {
     expect(serializePage(parsePage(serializePage(p)))).toBe(serializePage(p));
   });
 
+  it('round-trips a clip kind and preserves an unknown one (§21.5)', () => {
+    const p: Page = { ...base, clips: [{ ...base.clips[0], kind: 'disagree' }, { ...region, kind: 'wave' as never }] };
+    expect(parsePage(serializePage(p))).toEqual(p);
+    expect(serializePage(parsePage(serializePage(p)))).toBe(serializePage(p));
+    expect(clipKindOf(parsePage(serializePage(p)).clips[1])).toBeUndefined();
+  });
+
+  it('reads the reader note from v2 and v1 files, with yaml-special characters (§21.5)', () => {
+    const p: Page = { ...base, note: 'a: b "c" #d\n둘째 줄' };
+    expect(parsePage(serializePage(p))).toEqual(p);
+    const v1 = parsePage(V1_FIXTURE.replace('\nclips:', '\nnote: 한 줄\nclips:'));
+    expect(v1.note).toBe('한 줄');
+    expect(v1.extra).toBeUndefined();
+  });
+
   it('round-trips readAt and a bookmark with or without a position (§21.2)', () => {
     const later: Page = { ...base, bookmark: { createdAt: '2026-09-30T01:00:00.000Z' } };
     expect(parsePage(serializePage(later))).toEqual(later);
@@ -242,6 +264,15 @@ describe('forward compatibility', () => {
     const out = serializePage(p);
     expect(fmKeys(out)).toEqual(['title', 'url', 'savedAt', 'tags', 'rating', 'nested']);
     expect(parsePage(out)).toEqual(p);
+  });
+
+  it('writes a note that an older version kept in extra, so the upgrade window loses nothing (§21.5 review)', () => {
+    // 1.1.x가 note를 모르는 키로 extra에 보존 → 업그레이드 뒤 page.note 없이 다시 쓰는 경우
+    const md = serializePage({ ...base, extra: { note: '옛 한 줄', other: 1 } });
+    expect(md).toContain('\nnote: 옛 한 줄\n');
+    expect(parsePage(md)).toMatchObject({ note: '옛 한 줄', extra: { other: 1 } });
+    // page.note가 있으면 그것이 이긴다
+    expect(serializePage({ ...base, note: '새 한 줄', extra: { note: '옛 한 줄' } })).toContain('\nnote: 새 한 줄\n');
   });
 
   it('keeps unknown block keys in extraData and writes them back', () => {
@@ -305,6 +336,18 @@ describe('clipColorOf (§21.3)', () => {
   });
 });
 
+describe('clipKindOf / normalizeNote (§21.5)', () => {
+  it('is undefined when missing or unknown, else the stored kind', () => {
+    expect(clipKindOf({})).toBeUndefined();
+    expect(clipKindOf({ kind: 'wave' })).toBeUndefined();
+    expect(clipKindOf({ kind: 'star' })).toBe('star');
+  });
+  it('collapses whitespace and newlines into one space and trims', () => {
+    expect(normalizeNote('  a\n b\t\tc ')).toBe('a b c');
+    expect(normalizeNote(' \n ')).toBe('');
+  });
+});
+
 describe('templates (§21.4)', () => {
   const twoParas: Clip = { ...base.clips[0], id: 'c2', text: '단락1\n\n\n단락2', note: '메모', color: 'green' };
   const empty: Clip = { ...region, id: 'e1', text: '', html: undefined, image: undefined, note: '' };
@@ -344,11 +387,19 @@ describe('templates (§21.4)', () => {
     expect(parsePage(serializePage({ ...base, clips: [] }, TEMPLATE_OBSIDIAN))).toEqual({ ...base, clips: [] });
   });
 
+  it('puts the kind glyph before the note line in both presets, and alone when there is no note (§21.5)', () => {
+    const marked: Clip = { ...base.clips[0], kind: 'disagree' };
+    const noNote: Clip = { ...base.clips[0], id: 'c3', kind: 'star', note: '' };
+    expect(bodyOf(serializePage({ ...base, clips: [marked, noNote] }))).toBe('## Clips\n\n> 인용된 문장\n\n× 내 메모\n\n> 인용된 문장\n\n★\n\n## Content\n\n본문 첫 문단.\n\n본문 둘째 문단.\n');
+    expect(bodyOf(serializePage({ ...base, clips: [marked, noNote] }, TEMPLATE_OBSIDIAN))).toBe('## Clips\n\n==인용된 문장==\n\n× 내 메모\n\n==인용된 문장==\n\n★\n\n## Content\n\n본문 첫 문단.\n\n본문 둘째 문단.\n');
+    expect(parsePage(serializePage({ ...base, clips: [marked, noNote] }))).toEqual({ ...base, clips: [marked, noNote] });
+  });
+
   it('a custom template sees page, clip and color data', () => {
-    const tpl = '{{title}}|{{#tags}}{{.}},{{/tags}}|{{#clips}}{{color}}:{{colorHex}}:{{isText}}:{{hasNote}};{{/clips}}|{{#bookmark}}{{quote}}{{/bookmark}}\n## Content\n\n{{content}}\n';
-    const p: Page = { ...base, clips: [twoParas], bookmark: { createdAt: '2026-09-30T01:00:00.000Z', quote: '여기' } };
+    const tpl = '{{title}}|{{#tags}}{{.}},{{/tags}}|{{#clips}}{{color}}:{{colorHex}}:{{isText}}:{{hasNote}}:{{kind}}:{{glyph}}:{{noteLine}};{{/clips}}|{{#bookmark}}{{quote}}{{/bookmark}}|{{note}}\n## Content\n\n{{content}}\n';
+    const p: Page = { ...base, note: '한 줄', clips: [{ ...twoParas, kind: 'question' }], bookmark: { createdAt: '2026-09-30T01:00:00.000Z', quote: '여기' } };
     const md = serializePage(p, tpl);
-    expect(bodyOf(md)).toBe('예시 글 제목|react,state,|green:#34C759:true:true;|여기\n## Content\n\n본문 첫 문단.\n\n본문 둘째 문단.\n');
+    expect(bodyOf(md)).toBe('예시 글 제목|react,state,|green:#34C759:true:true:question:?:? 메모;|여기|한 줄\n## Content\n\n본문 첫 문단.\n\n본문 둘째 문단.\n');
     expect(parsePage(md)).toEqual(p);
   });
 });

@@ -6,6 +6,8 @@ export type Change =
   | { kind: 'add_clip'; title: string; text: string }
   | { kind: 'set_clip_note'; title: string; note: string }
   | { kind: 'set_summary'; title: string; summary: string }
+  // 「이 글 한 줄」(§21.5)
+  | { kind: 'set_note'; title: string; note: string }
   | { kind: 'delete_pages'; titles: string[] }
   | { kind: 'restore_pages'; titles: string[] }
   // 책갈피(§21.2)
@@ -60,6 +62,7 @@ function ko(c: Change): string {
     case 'add_clip': return `'${c.title}'에 클립 "${clip(c.text)}"을 추가할까요?`;
     case 'set_clip_note': return c.note ? `'${c.title}'의 클립 메모를 "${clip(c.note)}"으로 바꿀까요?` : `'${c.title}'의 클립 메모를 지울까요?`;
     case 'set_summary': return c.summary ? `'${c.title}'의 요약을 "${clip(c.summary)}"으로 바꿀까요?` : `'${c.title}'의 요약을 지울까요?`;
+    case 'set_note': return c.note ? `'${c.title}'의 한 줄을 "${clip(c.note)}"으로 바꿀까요?` : `'${c.title}'의 한 줄을 지울까요?`;
     case 'delete_pages': return `${quoteTitles(c.titles, 'ko')}${josa(particleWord(c.titles), '을', '를')} 삭제할까요? (30일 안에 복구 가능)`;
     case 'restore_pages': return `${quoteTitles(c.titles, 'ko')}${josa(particleWord(c.titles), '을', '를')} 복구할까요?`;
     case 'set_bookmark': return c.quote ? `'${c.title}'의 "${clip(c.quote)}"에 책갈피를 꽂을까요?` : `'${c.title}'에 책갈피를 꽂을까요?`;
@@ -82,6 +85,7 @@ function en(c: Change): string {
     case 'add_clip': return `Add the clip "${clip(c.text)}" to '${c.title}'?`;
     case 'set_clip_note': return c.note ? `Change the clip note on '${c.title}' to "${clip(c.note)}"?` : `Clear the clip note on '${c.title}'?`;
     case 'set_summary': return c.summary ? `Change the summary of '${c.title}' to "${clip(c.summary)}"?` : `Clear the summary of '${c.title}'?`;
+    case 'set_note': return c.note ? `Change the one-liner for '${c.title}' to "${clip(c.note)}"?` : `Clear the one-liner for '${c.title}'?`;
     case 'delete_pages': return `Delete ${quoteTitles(c.titles, 'en')}? (restorable for 30 days)`;
     case 'restore_pages': return `Restore ${quoteTitles(c.titles, 'en')}?`;
     case 'set_bookmark': return c.quote ? `Bookmark '${c.title}' at "${clip(c.quote)}"?` : `Bookmark '${c.title}'?`;
@@ -103,6 +107,7 @@ function ja(c: Change): string {
     case 'add_clip': return `'${c.title}'にクリップ「${clip(c.text)}」を追加しますか？`;
     case 'set_clip_note': return c.note ? `'${c.title}'のクリップメモを「${clip(c.note)}」に変更しますか？` : `'${c.title}'のクリップメモを削除しますか？`;
     case 'set_summary': return c.summary ? `'${c.title}'の要約を「${clip(c.summary)}」に変更しますか？` : `'${c.title}'の要約を削除しますか？`;
+    case 'set_note': return c.note ? `'${c.title}'の一行を「${clip(c.note)}」に変更しますか？` : `'${c.title}'の一行を削除しますか？`;
     case 'delete_pages': return `${quoteTitles(c.titles, 'ja')}を削除しますか？（30日以内なら復元できます）`;
     case 'restore_pages': return `${quoteTitles(c.titles, 'ja')}を復元しますか？`;
     case 'set_bookmark': return c.quote ? `'${c.title}'の「${clip(c.quote)}」にしおりを挟みますか？` : `'${c.title}'にしおりを挟みますか？`;
@@ -120,6 +125,7 @@ function es(c: Change): string {
     case 'add_clip': return `¿Añadir el clip "${clip(c.text)}" a '${c.title}'?`;
     case 'set_clip_note': return c.note ? `¿Cambiar la nota del clip en '${c.title}' a "${clip(c.note)}"?` : `¿Borrar la nota del clip en '${c.title}'?`;
     case 'set_summary': return c.summary ? `¿Cambiar el resumen de '${c.title}' a "${clip(c.summary)}"?` : `¿Borrar el resumen de '${c.title}'?`;
+    case 'set_note': return c.note ? `¿Cambiar tu línea sobre '${c.title}' a "${clip(c.note)}"?` : `¿Borrar tu línea sobre '${c.title}'?`;
     case 'delete_pages': return `¿Eliminar ${quoteTitles(c.titles, 'es')}? (se puede restaurar durante 30 días)`;
     case 'restore_pages': return `¿Restaurar ${quoteTitles(c.titles, 'es')}?`;
     case 'set_bookmark': return c.quote ? `¿Poner un marcapáginas en '${c.title}', en "${clip(c.quote)}"?` : `¿Poner un marcapáginas en '${c.title}'?`;
@@ -137,6 +143,7 @@ function ptBR(c: Change): string {
     case 'add_clip': return `Adicionar o clipe "${clip(c.text)}" em '${c.title}'?`;
     case 'set_clip_note': return c.note ? `Alterar a nota do clipe em '${c.title}' para "${clip(c.note)}"?` : `Apagar a nota do clipe em '${c.title}'?`;
     case 'set_summary': return c.summary ? `Alterar o resumo de '${c.title}' para "${clip(c.summary)}"?` : `Apagar o resumo de '${c.title}'?`;
+    case 'set_note': return c.note ? `Alterar a sua linha de '${c.title}' para "${clip(c.note)}"?` : `Apagar a sua linha de '${c.title}'?`;
     case 'delete_pages': return `Excluir ${quoteTitles(c.titles, 'pt-BR')}? (é possível restaurar por 30 dias)`;
     case 'restore_pages': return `Restaurar ${quoteTitles(c.titles, 'pt-BR')}?`;
     case 'set_bookmark': return c.quote ? `Marcar '${c.title}' a partir de "${clip(c.quote)}"?` : `Marcar '${c.title}' para ler depois?`;
@@ -154,6 +161,7 @@ function de(c: Change): string {
     case 'add_clip': return `Clip "${clip(c.text)}" zu '${c.title}' hinzufügen?`;
     case 'set_clip_note': return c.note ? `Clip-Notiz von '${c.title}' in "${clip(c.note)}" ändern?` : `Clip-Notiz von '${c.title}' löschen?`;
     case 'set_summary': return c.summary ? `Zusammenfassung von '${c.title}' in "${clip(c.summary)}" ändern?` : `Zusammenfassung von '${c.title}' löschen?`;
+    case 'set_note': return c.note ? `Den Satz zu '${c.title}' in "${clip(c.note)}" ändern?` : `Den Satz zu '${c.title}' löschen?`;
     case 'delete_pages': return `${quoteTitles(c.titles, 'de')} löschen? (30 Tage lang wiederherstellbar)`;
     case 'restore_pages': return `${quoteTitles(c.titles, 'de')} wiederherstellen?`;
     case 'set_bookmark': return c.quote ? `Lesezeichen in '${c.title}' bei "${clip(c.quote)}" setzen?` : `Lesezeichen in '${c.title}' setzen?`;
@@ -171,6 +179,7 @@ function fr(c: Change): string {
     case 'add_clip': return `Ajouter le clip « ${clip(c.text)} » à '${c.title}' ?`;
     case 'set_clip_note': return c.note ? `Remplacer la note du clip dans '${c.title}' par « ${clip(c.note)} » ?` : `Effacer la note du clip dans '${c.title}' ?`;
     case 'set_summary': return c.summary ? `Remplacer le résumé de '${c.title}' par « ${clip(c.summary)} » ?` : `Effacer le résumé de '${c.title}' ?`;
+    case 'set_note': return c.note ? `Remplacer votre ligne pour '${c.title}' par « ${clip(c.note)} » ?` : `Effacer votre ligne pour '${c.title}' ?`;
     case 'delete_pages': return `Supprimer ${quoteTitles(c.titles, 'fr')} ? (restaurable pendant 30 jours)`;
     case 'restore_pages': return `Restaurer ${quoteTitles(c.titles, 'fr')} ?`;
     case 'set_bookmark': return c.quote ? `Placer un marque-page dans '${c.title}' : « ${clip(c.quote)} » ?` : `Placer un marque-page dans '${c.title}' ?`;

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { DEFAULT_CLIP_COLOR, MAX_CLIP_TEXT_CHARS, bookmarkQuote, extractDomain, normalizeUrl, type Bookmark, type Clip, type ClipColor, type Page, type Selector } from '@markpin/shared';
+import { type Bookmark, type Clip, type ClipColor, type ClipKind, DEFAULT_CLIP_COLOR, MAX_CLIP_TEXT_CHARS, type Page, type Selector, bookmarkQuote, extractDomain, normalizeNote, normalizeUrl } from '@markpin/shared';
 import { safeNormalize, type Store } from './store';
 import { normalizeTag, normalizeTags } from './tags';
 import { writePage } from './write';
@@ -111,13 +111,13 @@ function quoteSelector(page: Page, text: string): { selector: Extract<Selector, 
 
 const NOT_ANCHORED_NOTE = 'The text was not found in the saved content, so it may not be highlighted when the page is revisited.';
 
-export async function addClip(store: Store, input: { pageId: string; text: string; note?: string; color?: ClipColor }, now: string = new Date().toISOString()) {
+export async function addClip(store: Store, input: { pageId: string; text: string; note?: string; color?: ClipColor; kind?: ClipKind }, now: string = new Date().toISOString()) {
   const page = requirePage(store, input.pageId);
   const text = input.text.trim();
   if (!text) throw new Error('Clip text is empty');
   if (text.length > MAX_CLIP_TEXT_CHARS) throw new Error(`Clip text exceeds ${MAX_CLIP_TEXT_CHARS} characters`);
   const { selector: quote, anchored } = quoteSelector(page, text);
-  const clip: Clip = { id: randomUUID(), type: 'text', createdAt: now, updatedAt: now, text, note: input.note ?? '', selectors: [quote], color: input.color ?? DEFAULT_CLIP_COLOR };
+  const clip: Clip = { id: randomUUID(), type: 'text', createdAt: now, updatedAt: now, text, note: input.note ?? '', selectors: [quote], color: input.color ?? DEFAULT_CLIP_COLOR, ...(input.kind ? { kind: input.kind } : {}) };
   const written = await writePage(store, { ...page, clips: [...page.clips, clip] }, now);
   const note = [SIDEPANEL_NOTE];
   if (!anchored) note.push(NOT_ANCHORED_NOTE);
@@ -183,6 +183,18 @@ export async function setSummary(store: Store, input: { pageId: string; summary:
   const next: Page = { ...page };
   if (after) next.summary = after;
   else delete next.summary;
+  const written = await writePage(store, next, now);
+  return { page: ref(written), before, after, note: [SIDEPANEL_NOTE] };
+}
+
+/** 「이 글 한 줄」(§21.5): frontmatter `note`. 공백 정규화, 빈 값이면 지운다. */
+export async function setNote(store: Store, input: { pageId: string; note: string }, now: string = new Date().toISOString()) {
+  const page = requirePage(store, input.pageId);
+  const after = normalizeNote(input.note);
+  const before = page.note ?? '';
+  const next: Page = { ...page };
+  if (after) next.note = after;
+  else delete next.note;
   const written = await writePage(store, next, now);
   return { page: ref(written), before, after, note: [SIDEPANEL_NOTE] };
 }

@@ -1,19 +1,19 @@
 import YAML from 'yaml';
 import { TEMPLATE_DEFAULT, TEMPLATE_OBSIDIAN } from './presets';
 import { render, type TemplateData } from './template';
-import { CLIP_COLOR_HEX, clipColorOf, type Bookmark, type Clip, type Page } from './types';
+import { CLIP_COLOR_HEX, CLIP_KIND_GLYPH, clipColorOf, clipKindOf, type Bookmark, type Clip, type Page } from './types';
 
 export const MARKPIN_FORMAT_VERSION = 2;
 export const MAX_FILE_BYTES = 512 * 1024;
 
 /** v2 frontmatter(사람용). Obsidian Properties에 이 키만 보인다(§22). */
-const FM_ORDER = ['title', 'url', 'savedAt', 'tags', 'summary', 'readAt', 'deletedAt'] as const;
+const FM_ORDER = ['title', 'url', 'savedAt', 'tags', 'summary', 'note', 'readAt', 'deletedAt'] as const;
 const FM_KNOWN = new Set<string>(FM_ORDER);
 /** v2 markpin 블록(기계용). */
 const DATA_ORDER = ['id', 'rev', 'updatedAt', 'domain', 'clips', 'bookmark', 'contentTruncated'] as const;
 const DATA_KNOWN = new Set<string>(['v', ...DATA_ORDER]);
 /** v1 frontmatter(읽기 전용, 2026-10-01 이전). */
-const V1_KNOWN = new Set<string>(['markpin', 'id', 'url', 'title', 'domain', 'savedAt', 'updatedAt', 'rev', 'tags', 'summary', 'readAt', 'bookmark', 'contentTruncated', 'deletedAt', 'clips']);
+const V1_KNOWN = new Set<string>(['markpin', 'id', 'url', 'title', 'domain', 'savedAt', 'updatedAt', 'rev', 'tags', 'summary', 'note', 'readAt', 'bookmark', 'contentTruncated', 'deletedAt', 'clips']);
 
 /** 기계 데이터 블록(§22). 파일 **끝**에 둔다 — Obsidian Live Preview가 HTML 주석을 숨기지 않아, 맨 위에 두면 회색 JSON이 본문보다 먼저 보인다. */
 const BLOCK_OPEN = '<!-- markpin\n';
@@ -35,7 +35,11 @@ export function templateData(page: Pick<Page, 'clips'> & Partial<Page>, content:
       const body = clip.type === 'region' && clip.html ? clip.html : clip.text;
       const quoted = body ? body.split('\n').map((line) => `> ${line}`).join('\n') : '';
       const color = clipColorOf(clip);
-      const parts = [clip.image ? `![](../../${clip.image.path})` : '', quoted, clip.note].filter(Boolean);
+      const kind = clipKindOf(clip);
+      const glyph = kind ? CLIP_KIND_GLYPH[kind] : '';
+      // 기호=반응, 메모=이유 — 한 줄로(§21.5). 기호 없는 클립은 예전 모양 그대로.
+      const noteLine = [glyph, clip.note].filter(Boolean).join(' ');
+      const parts = [clip.image ? `![](../../${clip.image.path})` : '', quoted, noteLine].filter(Boolean);
       return {
         last: i === all.length - 1,
         block: parts.length > 0 ? `${parts.join('\n\n')}\n` : '',
@@ -45,6 +49,9 @@ export function templateData(page: Pick<Page, 'clips'> & Partial<Page>, content:
         note: clip.note,
         color,
         colorHex: CLIP_COLOR_HEX[color],
+        kind: kind ?? '',
+        glyph,
+        noteLine,
         // 페이지 파일은 pages/{YYYY}/ 아래에 있으므로 템플릿이 `../../`를 붙인다
         image: clip.image?.path,
         isText: clip.type === 'text',
@@ -62,6 +69,7 @@ export function templateData(page: Pick<Page, 'clips'> & Partial<Page>, content:
     savedAt: page.savedAt,
     updatedAt: page.updatedAt,
     summary: page.summary,
+    note: page.note,
     readAt: page.readAt,
     tags: page.tags ?? [],
     bookmark: page.bookmark ? { quote: page.bookmark.quote, createdAt: page.bookmark.createdAt } : undefined,
@@ -97,8 +105,11 @@ function findContentStart(body: string, page: Pick<Page, 'clips'> & Partial<Page
 function buildFrontmatter(page: Page): string {
   const fm: Record<string, unknown> = {};
   for (const key of FM_ORDER) {
-    const value = page[key];
-    if (value !== undefined) fm[key] = value;
+    let value = page[key];
+    // 1.1.x(note를 모르던 버전)가 extra에 보존한 note는 업그레이드 뒤 page.note 없이 다시 쓸 때 잃지 않는다(§21.5)
+    if (key === 'note' && value === undefined && typeof page.extra?.note === 'string') value = page.extra.note;
+    // 빈 문자열은 "없음"(note '' 등) — 키를 쓰지 않는다
+    if (value !== undefined && value !== '') fm[key] = value;
   }
   for (const [k, v] of Object.entries(page.extra ?? {})) if (!FM_KNOWN.has(k)) fm[k] = v;
   return YAML.stringify(fm, { lineWidth: 0 });
@@ -167,10 +178,11 @@ function pick<T>(src: Record<string, unknown>, key: string): T | undefined {
   return src[key] as T | undefined;
 }
 
-type OptionalKey = 'summary' | 'readAt' | 'bookmark' | 'deletedAt' | 'contentTruncated';
+type OptionalKey = 'summary' | 'note' | 'readAt' | 'bookmark' | 'deletedAt' | 'contentTruncated';
 
 function assign(page: Page, src: Record<string, unknown>, keys: readonly OptionalKey[]): void {
   if (keys.includes('summary') && src.summary !== undefined) page.summary = src.summary as string;
+  if (keys.includes('note') && typeof src.note === 'string' && src.note !== '') page.note = src.note;
   if (keys.includes('readAt') && src.readAt !== undefined) page.readAt = src.readAt as string;
   if (keys.includes('bookmark') && src.bookmark !== undefined) page.bookmark = src.bookmark as Bookmark;
   if (keys.includes('contentTruncated') && src.contentTruncated === true) page.contentTruncated = true;
@@ -210,7 +222,7 @@ function parseV1(fm: Record<string, unknown>, body: string, template?: string): 
     tags: pick<string[]>(fm, 'tags') ?? [],
     clips: pick<Clip[]>(fm, 'clips') ?? []
   };
-  assign(page, fm, ['summary', 'readAt', 'bookmark', 'contentTruncated', 'deletedAt']);
+  assign(page, fm, ['summary', 'note', 'readAt', 'bookmark', 'contentTruncated', 'deletedAt']);
   const extra = unknownKeys(fm, V1_KNOWN);
   if (extra) page.extra = extra;
   return withContent(page, body, template);
@@ -255,7 +267,7 @@ export function parsePage(source: string, template?: string): Page {
     tags: pick<string[]>(fm, 'tags') ?? [],
     clips: pick<Clip[]>(data, 'clips') ?? []
   };
-  assign(page, fm, ['summary', 'readAt', 'deletedAt']);
+  assign(page, fm, ['summary', 'note', 'readAt', 'deletedAt']);
   assign(page, data, ['bookmark', 'contentTruncated']);
   const extra = unknownKeys(fm, FM_KNOWN);
   if (extra) page.extra = extra;

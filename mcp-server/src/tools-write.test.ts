@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { INBOX_PATH, parsePage } from '@markpin/shared';
 import { loadDir, type Store } from './store';
 import { makeFixture, mk } from './test/fixture';
-import { addClip, clearBookmark, deletePages, INBOX_NOTE, markRead, restorePages, savePage, setBookmark, SIDEPANEL_NOTE, setClipNote, setSummary, updateTags } from './tools-write';
+import { addClip, clearBookmark, deletePages, INBOX_NOTE, markRead, restorePages, savePage, setBookmark, SIDEPANEL_NOTE, setClipNote, setNote, setSummary, updateTags } from './tools-write';
 import { writePage } from './write';
 
 const NOW = '2026-02-01T00:00:00.000Z';
@@ -132,6 +132,15 @@ describe('addClip', () => {
     const clip = (await onDisk(store, pages.a.id)).clips.find((c) => c.id === r.clipId)!;
     expect(clip.color).toBe('blue');
   });
+  it('stores the requested kind and omits the field without one (§21.5)', async () => {
+    const { dir, pages } = await makeFixture();
+    const store = await loadDir(dir);
+    const r = await addClip(store, { pageId: pages.a.id, text: 'immer', kind: 'star' }, NOW);
+    const r2 = await addClip(store, { pageId: pages.a.id, text: 'immer', note: 'n' }, NOW);
+    const clips = (await onDisk(store, pages.a.id)).clips;
+    expect(clips.find((c) => c.id === r.clipId)?.kind).toBe('star');
+    expect('kind' in clips.find((c) => c.id === r2.clipId)!).toBe(false);
+  });
   it('rejects empty, too long, or unknown page', async () => {
     const { dir, pages } = await makeFixture();
     const store = await loadDir(dir);
@@ -176,6 +185,22 @@ describe('setSummary', () => {
     expect(r2).toMatchObject({ before: '새 요약', after: '' });
     expect((await onDisk(store, pages.a.id)).summary).toBeUndefined();
     await expect(setSummary(store, { pageId: 'nope', summary: 'x' }, NOW)).rejects.toThrow(/not found/);
+  });
+});
+
+describe('setNote (§21.5)', () => {
+  it('writes the normalized one-line note to the frontmatter, reports before/after, and clears it on empty', async () => {
+    const { dir, pages } = await makeFixture();
+    const store = await loadDir(dir);
+    const r = await setNote(store, { pageId: pages.a.id, note: '  한 줄\n둘째 ' }, NOW);
+    expect(r).toMatchObject({ before: '', after: '한 줄 둘째' });
+    const disk = await onDisk(store, pages.a.id);
+    expect(disk.note).toBe('한 줄 둘째');
+    expect(await readFile(store.paths.get(pages.a.id)!, 'utf8')).toContain('\nnote: 한 줄 둘째\n');
+    const r2 = await setNote(store, { pageId: pages.a.id, note: ' ' }, NOW);
+    expect(r2).toMatchObject({ before: '한 줄 둘째', after: '' });
+    expect((await onDisk(store, pages.a.id)).note).toBeUndefined();
+    await expect(setNote(store, { pageId: 'nope', note: 'x' }, NOW)).rejects.toThrow(/not found/);
   });
 });
 

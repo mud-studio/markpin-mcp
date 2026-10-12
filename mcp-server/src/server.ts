@@ -1,13 +1,13 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
-import { CLIP_COLORS, MAX_CLIP_TEXT_CHARS, normalizeUrl } from '@markpin/shared';
+import { CLIP_COLORS, CLIP_KINDS, MAX_CLIP_TEXT_CHARS, normalizeUrl } from '@markpin/shared';
 import pkg from '../package.json';
 import type { Lang } from './cli';
 import { confirmLabel, confirmMessage, type Change } from './messages';
 import type { Store } from './store';
 import { getPage, listRecent, listTags, search } from './tools';
-import { addClip, clearBookmark, deletePages, markRead, MAX_SUMMARY_CHARS, planTags, restorePages, savePage, setBookmark, setClipNote, setSummary, updateTags, type FetchPage } from './tools-write';
+import { addClip, clearBookmark, deletePages, markRead, MAX_SUMMARY_CHARS, planTags, restorePages, savePage, setBookmark, setClipNote, setNote, setSummary, updateTags, type FetchPage } from './tools-write';
 
 export type ServerOptions = {
   store: () => Store;
@@ -58,7 +58,7 @@ export function createServer(opts: ServerOptions): McpServer {
     {
       title: 'Get a saved page',
       description:
-        'Returns one page in full: metadata, tags, summary, extracted content, every clip with its note and highlight color, ' +
+        "Returns one page in full: metadata, tags, summary, the reader's one-line note (`note`), extracted content, every clip with its note, highlight color and reaction mark (`kind`), " +
         'the absolute path of the Markdown file, and absolute paths of clip images. Accepts a page id or its URL.',
       inputSchema: { idOrUrl: z.string().describe('Page id (UUID) or the page URL.') },
       annotations: { readOnlyHint: true }
@@ -204,7 +204,8 @@ export function createServer(opts: ServerOptions): McpServer {
         pageId: z.string().describe('Page id.'),
         text: z.string().trim().min(1).max(MAX_CLIP_TEXT_CHARS).describe('The exact text to clip.'),
         note: z.string().optional().describe('Your note on the clip.'),
-        color: z.enum(CLIP_COLORS).optional().describe('Highlight color (amber, green, blue, pink). Default amber.')
+        color: z.enum(CLIP_COLORS).optional().describe('Highlight color (amber, green, blue, pink). Default amber.'),
+        kind: z.enum(CLIP_KINDS).optional().describe('Reaction mark: question (?), insight (!), disagree (×), star (★). Default none.')
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false }
     },
@@ -255,6 +256,25 @@ export function createServer(opts: ServerOptions): McpServer {
         const page = store().pages.get(input.pageId);
         if (!page) throw new Error(`Page not found: ${input.pageId}`);
         return { change: { kind: 'set_summary', title: page.title, summary: input.summary.trim() }, run: () => setSummary(store(), input) };
+      })()
+  );
+
+  server.registerTool(
+    'set_note',
+    {
+      title: "Write the reader's one-line note",
+      description: "Sets the reader's own one-line note on a page (what they took from it — frontmatter `note`). An empty note clears it. " + WRITE_RULE,
+      inputSchema: {
+        pageId: z.string().describe('Page id.'),
+        note: z.string().max(500).describe('The one line; empty to clear. At most 500 characters.')
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true }
+    },
+    (input) =>
+      write(async () => {
+        const page = store().pages.get(input.pageId);
+        if (!page) throw new Error(`Page not found: ${input.pageId}`);
+        return { change: { kind: 'set_note', title: page.title, note: input.note.trim() }, run: () => setNote(store(), input) };
       })()
   );
 

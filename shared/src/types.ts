@@ -19,6 +19,20 @@ export function clipColorOf(clip: { color?: string }): ClipColor {
   return (CLIP_COLORS as readonly string[]).includes(clip.color ?? '') ? (clip.color as ClipColor) : DEFAULT_CLIP_COLOR;
 }
 
+/** 반응 기호(§21.5). 색과 독립. 없으면 기호 없음, 모르는 값은 보존하되 기호 없음으로 그린다. */
+export const CLIP_KINDS = ['question', 'insight', 'disagree', 'star'] as const;
+export type ClipKind = (typeof CLIP_KINDS)[number];
+export const CLIP_KIND_GLYPH: Record<ClipKind, string> = { question: '?', insight: '!', disagree: '×', star: '★' };
+
+export function clipKindOf(clip: { kind?: string }): ClipKind | undefined {
+  return (CLIP_KINDS as readonly string[]).includes(clip.kind ?? '') ? (clip.kind as ClipKind) : undefined;
+}
+
+/** 「이 글 한 줄」·메모 정규화: 공백·줄바꿈은 공백 하나로, 양끝 trim. 빈 결과는 "없음". */
+export function normalizeNote(s: string): string {
+  return s.replace(/\s+/g, ' ').trim();
+}
+
 export type Clip = {
   id: string;
   type: ClipType;
@@ -31,6 +45,8 @@ export type Clip = {
   image?: ClipImage;
   /** 없으면 앰버. 모르는 값은 보존하고 앰버로 그린다(§21.3). */
   color?: ClipColor;
+  /** 반응 기호(§21.5). 없으면 기호 없음. 모르는 값은 보존한다. */
+  kind?: ClipKind;
 };
 
 /** 읽기 책갈피(§21.2). `selectors`가 없으면 "처음부터"(나중에 읽기), 있으면 "여기부터"(읽는 중). 페이지당 1개. */
@@ -51,6 +67,8 @@ export type Page = {
   rev: number;
   tags: string[];
   summary?: string;
+  /** 「이 글 한 줄」(§21.5) — 사용자가 쓴 한 줄. frontmatter `note`. 빈 문자열은 없는 것과 같다. */
+  note?: string;
   readAt?: string;
   bookmark?: Bookmark;
   contentText?: string;

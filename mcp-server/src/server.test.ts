@@ -71,11 +71,11 @@ describe('tool registration', () => {
     const c = await connect(store, { allowWrite: true, elicit: 'none' });
     const tools = (await c.client.listTools()).tools;
     const byName = Object.fromEntries(tools.map((t) => [t.name, t]));
-    expect(Object.keys(byName).sort()).toEqual(['add_clip', 'clear_bookmark', 'delete_pages', 'get_page', 'list_recent', 'list_tags', 'mark_read', 'restore_pages', 'save_page', 'search', 'set_bookmark', 'set_clip_note', 'set_summary', 'update_tags']);
+    expect(Object.keys(byName).sort()).toEqual(['add_clip', 'clear_bookmark', 'delete_pages', 'get_page', 'list_recent', 'list_tags', 'mark_read', 'restore_pages', 'save_page', 'search', 'set_bookmark', 'set_clip_note', 'set_note', 'set_summary', 'update_tags']);
     expect(byName.search.annotations?.readOnlyHint).toBe(true);
     expect(byName.update_tags.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false, idempotentHint: true });
     expect(byName.delete_pages.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: true });
-    for (const name of ['save_page', 'update_tags', 'add_clip', 'set_clip_note', 'set_summary', 'delete_pages', 'restore_pages', 'set_bookmark', 'clear_bookmark', 'mark_read']) {
+    for (const name of ['save_page', 'update_tags', 'add_clip', 'set_clip_note', 'set_summary', 'set_note', 'delete_pages', 'restore_pages', 'set_bookmark', 'clear_bookmark', 'mark_read']) {
       expect(byName[name].description).toContain('Call only for a change the user explicitly asked for in this conversation.');
     }
     expect(byName.set_summary.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false, idempotentHint: true });

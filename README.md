@@ -1,6 +1,6 @@
 # Markpin MCP server
 
-Source of [`@markpin/mcp`](https://www.npmjs.com/package/@markpin/mcp) 0.7.1: an MCP server that lets Claude, Cursor and other AI clients search and read the web pages and highlights you saved with [Markpin](https://markpin.dev), a Chrome extension that keeps them as Markdown files in a folder you own.
+Source of [`@markpin/mcp`](https://www.npmjs.com/package/@markpin/mcp) 0.8.0: an MCP server that lets Claude, Cursor and other AI clients search and read the web pages and highlights you saved with [Markpin](https://markpin.dev), a Chrome extension that keeps them as Markdown files in a folder you own.
 
 Usage and setup: [mcp-server/README.md](mcp-server/README.md).
 
