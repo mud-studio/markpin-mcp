@@ -67,6 +67,8 @@ describe('confirmMessage', () => {
     expect(confirmMessage('ko', { kind: 'set_bookmark', title: 'A', quote: '여기부터' })).toBe("'A'의 \"여기부터\"에 책갈피를 꽂을까요?");
     expect(confirmMessage('ko', { kind: 'clear_bookmark', title: 'A' })).toBe("'A'의 책갈피를 뺄까요?");
     expect(confirmMessage('ko', { kind: 'mark_read', title: '요리법' })).toBe("'요리법'을 읽음으로 표시할까요?");
+    expect(confirmMessage('ko', { kind: 'mark_skimmed', title: '요리법' })).toBe("'요리법'을 훑어봄으로 표시할까요?");
+    expect(confirmMessage('en', { kind: 'mark_skimmed', title: 'A' })).toBe("Mark 'A' as skimmed?");
     expect(confirmMessage('en', { kind: 'set_bookmark', title: 'A', quote: 'from here' })).toBe(`Bookmark 'A' at "from here"?`);
     expect(confirmMessage('en', { kind: 'mark_read', title: 'A' })).toBe("Mark 'A' as read?");
   });
@@ -86,7 +88,8 @@ describe('confirmMessage', () => {
       { kind: 'set_bookmark', title: 'T' },
       { kind: 'set_bookmark', title: 'T', quote: 'q' },
       { kind: 'clear_bookmark', title: 'T' },
-      { kind: 'mark_read', title: 'T' }
+      { kind: 'mark_read', title: 'T' },
+      { kind: 'mark_skimmed', title: 'T' }
     ];
     for (const lang of LANGS) {
       for (const c of kinds) expect(confirmMessage(lang, c), `${lang} ${c.kind}`).toContain("'T'");

@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { INBOX_PATH, parsePage } from '@markpin/shared';
 import { loadDir, type Store } from './store';
 import { makeFixture, mk } from './test/fixture';
-import { addClip, clearBookmark, deletePages, INBOX_NOTE, markRead, restorePages, savePage, setBookmark, SIDEPANEL_NOTE, setClipNote, setNote, setSummary, updateTags } from './tools-write';
+import { addClip, clearBookmark, deletePages, INBOX_NOTE, markRead, markSkimmed, restorePages, savePage, setBookmark, SIDEPANEL_NOTE, setClipNote, setNote, setSummary, updateTags } from './tools-write';
 import { writePage } from './write';
 
 const NOW = '2026-02-01T00:00:00.000Z';
@@ -300,6 +300,34 @@ describe('bookmarks (§21.2)', () => {
     const r2 = await markRead(store, { pageId: pages.b.id }, NOW);
     expect(r2.changed).toBe(false);
     expect((await onDisk(store, pages.b.id)).readAt).toBe(pages.b.readAt);
+  });
+});
+
+describe('markSkimmed (§21.2 보강)', () => {
+  it('records skimmedAt, drops bookmark and readAt, and is a no-op when already skimmed', async () => {
+    const { dir, pages } = await makeFixture();
+    const store = await loadDir(dir);
+    const r = await markSkimmed(store, { pageId: pages.c.id }, NOW);
+    expect(r.changed).toBe(true);
+    const disk = await onDisk(store, pages.c.id);
+    expect(disk.skimmedAt).toBe(NOW);
+    expect(disk.bookmark).toBeUndefined();
+    expect(disk.readAt).toBeUndefined();
+    const r2 = await markSkimmed(store, { pageId: pages.c.id }, '2026-02-02T00:00:00.000Z');
+    expect(r2.changed).toBe(false);
+    expect((await onDisk(store, pages.c.id)).skimmedAt).toBe(NOW);
+  });
+  it('markRead and setBookmark clear skimmedAt', async () => {
+    const { dir, pages } = await makeFixture();
+    const store = await loadDir(dir);
+    await markSkimmed(store, { pageId: pages.c.id }, NOW);
+    await markRead(store, { pageId: pages.c.id }, NOW);
+    expect((await onDisk(store, pages.c.id)).skimmedAt).toBeUndefined();
+    await markSkimmed(store, { pageId: pages.c.id }, NOW);
+    await setBookmark(store, { pageId: pages.c.id }, NOW);
+    const disk = await onDisk(store, pages.c.id);
+    expect(disk.skimmedAt).toBeUndefined();
+    expect(disk.bookmark?.createdAt).toBe(NOW);
   });
 });
 

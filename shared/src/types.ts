@@ -70,6 +70,8 @@ export type Page = {
   /** 「이 글 한 줄」(§21.5) — 사용자가 쓴 한 줄. frontmatter `note`. 빈 문자열은 없는 것과 같다. */
   note?: string;
   readAt?: string;
+  /** 훑어봄(§21.2 보강, 2026-10-12). readAt·bookmark와 배타 — 셋 중 하나만. */
+  skimmedAt?: string;
   bookmark?: Bookmark;
   contentText?: string;
   contentTruncated?: boolean;

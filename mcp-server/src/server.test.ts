@@ -71,11 +71,11 @@ describe('tool registration', () => {
     const c = await connect(store, { allowWrite: true, elicit: 'none' });
     const tools = (await c.client.listTools()).tools;
     const byName = Object.fromEntries(tools.map((t) => [t.name, t]));
-    expect(Object.keys(byName).sort()).toEqual(['add_clip', 'clear_bookmark', 'delete_pages', 'get_page', 'list_recent', 'list_tags', 'mark_read', 'restore_pages', 'save_page', 'search', 'set_bookmark', 'set_clip_note', 'set_note', 'set_summary', 'update_tags']);
+    expect(Object.keys(byName).sort()).toEqual(['add_clip', 'clear_bookmark', 'delete_pages', 'get_page', 'list_recent', 'list_tags', 'mark_read', 'mark_skimmed', 'restore_pages', 'save_page', 'search', 'set_bookmark', 'set_clip_note', 'set_note', 'set_summary', 'update_tags']);
     expect(byName.search.annotations?.readOnlyHint).toBe(true);
     expect(byName.update_tags.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false, idempotentHint: true });
     expect(byName.delete_pages.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: true });
-    for (const name of ['save_page', 'update_tags', 'add_clip', 'set_clip_note', 'set_summary', 'set_note', 'delete_pages', 'restore_pages', 'set_bookmark', 'clear_bookmark', 'mark_read']) {
+    for (const name of ['save_page', 'update_tags', 'add_clip', 'set_clip_note', 'set_summary', 'set_note', 'delete_pages', 'restore_pages', 'set_bookmark', 'clear_bookmark', 'mark_read', 'mark_skimmed']) {
       expect(byName[name].description).toContain('Call only for a change the user explicitly asked for in this conversation.');
     }
     expect(byName.set_summary.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false, idempotentHint: true });
@@ -95,6 +95,15 @@ describe('write gate', () => {
     expect(r.json.gate).toBe('elicitation');
     expect(r.json.pages[0].after).toContain('new');
     expect(parsePage(await readFile(store.paths.get(a.id)!, 'utf8')).tags).toContain('new');
+    await c.close();
+  });
+  it('shows the normalized one-line in the set_note confirmation, matching what is written (§21.5 review)', async () => {
+    const c = await connect(store, { allowWrite: true, elicit: 'accept', lang: 'ko' });
+    const a = [...store.pages.values()].find((p) => p.title === 'React 상태 관리')!;
+    const r = await c.call('set_note', { pageId: a.id, note: '  한 줄\n둘째 ' });
+    expect(r.isError).toBe(false);
+    expect(c.seen).toEqual(["'React 상태 관리'의 한 줄을 \"한 줄 둘째\"으로 바꿀까요?"]);
+    expect(parsePage(await readFile(store.paths.get(a.id)!, 'utf8')).note).toBe('한 줄 둘째');
     await c.close();
   });
   it('returns isError and writes nothing on decline', async () => {

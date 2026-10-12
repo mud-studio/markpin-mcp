@@ -13,7 +13,8 @@ export type Change =
   // 책갈피(§21.2)
   | { kind: 'set_bookmark'; title: string; quote?: string }
   | { kind: 'clear_bookmark'; title: string }
-  | { kind: 'mark_read'; title: string };
+  | { kind: 'mark_read'; title: string }
+  | { kind: 'mark_skimmed'; title: string };
 
 const MAX_TITLES = 3;
 const MAX_TEXT = 40;
@@ -68,6 +69,7 @@ function ko(c: Change): string {
     case 'set_bookmark': return c.quote ? `'${c.title}'의 "${clip(c.quote)}"에 책갈피를 꽂을까요?` : `'${c.title}'에 책갈피를 꽂을까요?`;
     case 'clear_bookmark': return `'${c.title}'의 책갈피를 뺄까요?`;
     case 'mark_read': return `'${c.title}'${josa(c.title, '을', '를')} 읽음으로 표시할까요?`;
+    case 'mark_skimmed': return `'${c.title}'${josa(c.title, '을', '를')} 훑어봄으로 표시할까요?`;
   }
   const exhaustive: never = c;
   return exhaustive;
@@ -91,6 +93,7 @@ function en(c: Change): string {
     case 'set_bookmark': return c.quote ? `Bookmark '${c.title}' at "${clip(c.quote)}"?` : `Bookmark '${c.title}'?`;
     case 'clear_bookmark': return `Remove the bookmark from '${c.title}'?`;
     case 'mark_read': return `Mark '${c.title}' as read?`;
+    case 'mark_skimmed': return `Mark '${c.title}' as skimmed?`;
   }
   const exhaustive: never = c;
   return exhaustive;
@@ -113,6 +116,7 @@ function ja(c: Change): string {
     case 'set_bookmark': return c.quote ? `'${c.title}'の「${clip(c.quote)}」にしおりを挟みますか？` : `'${c.title}'にしおりを挟みますか？`;
     case 'clear_bookmark': return `'${c.title}'のしおりを外しますか？`;
     case 'mark_read': return `'${c.title}'を読了にしますか？`;
+    case 'mark_skimmed': return `'${c.title}'を流し読みにしますか？`;
   }
   const exhaustive: never = c;
   return exhaustive;
@@ -131,6 +135,7 @@ function es(c: Change): string {
     case 'set_bookmark': return c.quote ? `¿Poner un marcapáginas en '${c.title}', en "${clip(c.quote)}"?` : `¿Poner un marcapáginas en '${c.title}'?`;
     case 'clear_bookmark': return `¿Quitar el marcapáginas de '${c.title}'?`;
     case 'mark_read': return `¿Marcar '${c.title}' como leído?`;
+    case 'mark_skimmed': return `¿Marcar '${c.title}' como ojeado?`;
   }
   const exhaustive: never = c;
   return exhaustive;
@@ -149,6 +154,7 @@ function ptBR(c: Change): string {
     case 'set_bookmark': return c.quote ? `Marcar '${c.title}' a partir de "${clip(c.quote)}"?` : `Marcar '${c.title}' para ler depois?`;
     case 'clear_bookmark': return `Remover o marcador de '${c.title}'?`;
     case 'mark_read': return `Marcar '${c.title}' como lido?`;
+    case 'mark_skimmed': return `Marcar '${c.title}' como folheado?`;
   }
   const exhaustive: never = c;
   return exhaustive;
@@ -167,6 +173,7 @@ function de(c: Change): string {
     case 'set_bookmark': return c.quote ? `Lesezeichen in '${c.title}' bei "${clip(c.quote)}" setzen?` : `Lesezeichen in '${c.title}' setzen?`;
     case 'clear_bookmark': return `Lesezeichen aus '${c.title}' entfernen?`;
     case 'mark_read': return `'${c.title}' als gelesen markieren?`;
+    case 'mark_skimmed': return `'${c.title}' als überflogen markieren?`;
   }
   const exhaustive: never = c;
   return exhaustive;
@@ -185,6 +192,7 @@ function fr(c: Change): string {
     case 'set_bookmark': return c.quote ? `Placer un marque-page dans '${c.title}' : « ${clip(c.quote)} » ?` : `Placer un marque-page dans '${c.title}' ?`;
     case 'clear_bookmark': return `Retirer le marque-page de '${c.title}' ?`;
     case 'mark_read': return `Marquer '${c.title}' comme lu ?`;
+    case 'mark_skimmed': return `Marquer '${c.title}' comme parcouru ?`;
   }
   const exhaustive: never = c;
   return exhaustive;

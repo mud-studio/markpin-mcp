@@ -7,13 +7,13 @@ export const MARKPIN_FORMAT_VERSION = 2;
 export const MAX_FILE_BYTES = 512 * 1024;
 
 /** v2 frontmatter(사람용). Obsidian Properties에 이 키만 보인다(§22). */
-const FM_ORDER = ['title', 'url', 'savedAt', 'tags', 'summary', 'note', 'readAt', 'deletedAt'] as const;
+const FM_ORDER = ['title', 'url', 'savedAt', 'tags', 'summary', 'note', 'readAt', 'skimmedAt', 'deletedAt'] as const;
 const FM_KNOWN = new Set<string>(FM_ORDER);
 /** v2 markpin 블록(기계용). */
 const DATA_ORDER = ['id', 'rev', 'updatedAt', 'domain', 'clips', 'bookmark', 'contentTruncated'] as const;
 const DATA_KNOWN = new Set<string>(['v', ...DATA_ORDER]);
 /** v1 frontmatter(읽기 전용, 2026-10-01 이전). */
-const V1_KNOWN = new Set<string>(['markpin', 'id', 'url', 'title', 'domain', 'savedAt', 'updatedAt', 'rev', 'tags', 'summary', 'note', 'readAt', 'bookmark', 'contentTruncated', 'deletedAt', 'clips']);
+const V1_KNOWN = new Set<string>(['markpin', 'id', 'url', 'title', 'domain', 'savedAt', 'updatedAt', 'rev', 'tags', 'summary', 'note', 'readAt', 'skimmedAt', 'bookmark', 'contentTruncated', 'deletedAt', 'clips']);
 
 /** 기계 데이터 블록(§22). 파일 **끝**에 둔다 — Obsidian Live Preview가 HTML 주석을 숨기지 않아, 맨 위에 두면 회색 JSON이 본문보다 먼저 보인다. */
 const BLOCK_OPEN = '<!-- markpin\n';
@@ -71,6 +71,7 @@ export function templateData(page: Pick<Page, 'clips'> & Partial<Page>, content:
     summary: page.summary,
     note: page.note,
     readAt: page.readAt,
+    skimmedAt: page.skimmedAt,
     tags: page.tags ?? [],
     bookmark: page.bookmark ? { quote: page.bookmark.quote, createdAt: page.bookmark.createdAt } : undefined,
     clips,
@@ -178,12 +179,13 @@ function pick<T>(src: Record<string, unknown>, key: string): T | undefined {
   return src[key] as T | undefined;
 }
 
-type OptionalKey = 'summary' | 'note' | 'readAt' | 'bookmark' | 'deletedAt' | 'contentTruncated';
+type OptionalKey = 'summary' | 'note' | 'readAt' | 'skimmedAt' | 'bookmark' | 'deletedAt' | 'contentTruncated';
 
 function assign(page: Page, src: Record<string, unknown>, keys: readonly OptionalKey[]): void {
   if (keys.includes('summary') && src.summary !== undefined) page.summary = src.summary as string;
   if (keys.includes('note') && typeof src.note === 'string' && src.note !== '') page.note = src.note;
   if (keys.includes('readAt') && src.readAt !== undefined) page.readAt = src.readAt as string;
+  if (keys.includes('skimmedAt') && src.skimmedAt !== undefined) page.skimmedAt = src.skimmedAt as string;
   if (keys.includes('bookmark') && src.bookmark !== undefined) page.bookmark = src.bookmark as Bookmark;
   if (keys.includes('contentTruncated') && src.contentTruncated === true) page.contentTruncated = true;
   if (keys.includes('deletedAt') && src.deletedAt !== undefined) page.deletedAt = src.deletedAt as string;
@@ -222,7 +224,7 @@ function parseV1(fm: Record<string, unknown>, body: string, template?: string): 
     tags: pick<string[]>(fm, 'tags') ?? [],
     clips: pick<Clip[]>(fm, 'clips') ?? []
   };
-  assign(page, fm, ['summary', 'note', 'readAt', 'bookmark', 'contentTruncated', 'deletedAt']);
+  assign(page, fm, ['summary', 'note', 'readAt', 'skimmedAt', 'bookmark', 'contentTruncated', 'deletedAt']);
   const extra = unknownKeys(fm, V1_KNOWN);
   if (extra) page.extra = extra;
   return withContent(page, body, template);
@@ -267,7 +269,7 @@ export function parsePage(source: string, template?: string): Page {
     tags: pick<string[]>(fm, 'tags') ?? [],
     clips: pick<Clip[]>(data, 'clips') ?? []
   };
-  assign(page, fm, ['summary', 'note', 'readAt', 'deletedAt']);
+  assign(page, fm, ['summary', 'note', 'readAt', 'skimmedAt', 'deletedAt']);
   assign(page, data, ['bookmark', 'contentTruncated']);
   const extra = unknownKeys(fm, FM_KNOWN);
   if (extra) page.extra = extra;

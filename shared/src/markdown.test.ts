@@ -224,6 +224,16 @@ describe('parsePage', () => {
     expect(serializePage(parsePage(serializePage(p)))).toBe(serializePage(p));
   });
 
+  it('writes skimmedAt after readAt and before deletedAt, and reads it from v1 and v2 (§21.2 보강)', () => {
+    const md = serializePage({ ...base, note: '한 줄', readAt: '2026-09-30T02:00:00.000Z', skimmedAt: '2026-10-01T00:00:00.000Z', deletedAt: '2026-10-02T00:00:00.000Z' });
+    expect(fmKeys(md)).toEqual(['title', 'url', 'savedAt', 'tags', 'note', 'readAt', 'skimmedAt', 'deletedAt']);
+    const p: Page = { ...base, skimmedAt: '2026-10-01T00:00:00.000Z' };
+    expect(parsePage(serializePage(p))).toEqual(p);
+    const v1 = parsePage(V1_FIXTURE.replace('\nclips:', '\nskimmedAt: 2026-10-01T00:00:00.000Z\nclips:'));
+    expect(v1.skimmedAt).toBe('2026-10-01T00:00:00.000Z');
+    expect(v1.extra).toBeUndefined();
+  });
+
   it('round-trips a clip kind and preserves an unknown one (§21.5)', () => {
     const p: Page = { ...base, clips: [{ ...base.clips[0], kind: 'disagree' }, { ...region, kind: 'wave' as never }] };
     expect(parsePage(serializePage(p))).toEqual(p);

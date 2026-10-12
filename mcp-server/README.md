@@ -141,6 +141,7 @@ Write (`--allow-write`):
 | `set_clip_note` | Replaces the note on a clip (empty clears it). |
 | `set_summary` | Replaces a page's summary (empty clears it). Handy for pages saved without one. |
 | `set_note` | Sets the reader's own one-line note on a page (frontmatter `note`; empty clears it). |
+| `mark_skimmed` | Marks a page as skimmed (`skimmedAt`); removes its bookmark and read mark. |
 | `delete_pages` | Marks pages deleted. The Markpin extension keeps them for 30 days and can restore them; this server never deletes files. |
 | `restore_pages` | Brings back pages deleted within the last 30 days. |
 | `set_bookmark` | Puts the reading bookmark on a page — from the start, or at a `quote` from the content to resume there. Replaces any existing bookmark and clears the read mark. |

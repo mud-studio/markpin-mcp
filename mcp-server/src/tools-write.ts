@@ -140,6 +140,7 @@ export async function setBookmark(store: Store, input: { pageId: string; quote?:
   }
   const next: Page = { ...page, bookmark };
   delete next.readAt;
+  delete next.skimmedAt; // 세 상태 배타(§21.2 보강)
   const written = await writePage(store, next, now);
   const note = [SIDEPANEL_NOTE];
   if (anchored === false) note.push(NOT_ANCHORED_NOTE);
@@ -158,11 +159,23 @@ export async function clearBookmark(store: Store, input: { pageId: string }, now
 /** 읽음(§21.2): `readAt` 기록 + 책갈피 제거. 이미 읽음이고 책갈피도 없으면 그대로. */
 export async function markRead(store: Store, input: { pageId: string }, now: string = new Date().toISOString()) {
   const page = requirePage(store, input.pageId);
-  if (page.readAt !== undefined && !page.bookmark) return { page: ref(page), readAt: page.readAt, changed: false, note: ['Already marked as read; nothing was written.'] };
+  if (page.readAt !== undefined && !page.bookmark && page.skimmedAt === undefined) return { page: ref(page), readAt: page.readAt, changed: false, note: ['Already marked as read; nothing was written.'] };
   const next: Page = { ...page, readAt: now };
   delete next.bookmark;
+  delete next.skimmedAt;
   const written = await writePage(store, next, now);
   return { page: ref(written), readAt: now, changed: true, note: [SIDEPANEL_NOTE] };
+}
+
+/** 훑어봄(§21.2 보강): 책갈피·읽음을 지우고 `skimmedAt`. 이미 훑음이고 지울 게 없으면 no-op. */
+export async function markSkimmed(store: Store, input: { pageId: string }, now: string = new Date().toISOString()) {
+  const page = requirePage(store, input.pageId);
+  if (page.skimmedAt !== undefined && !page.bookmark && page.readAt === undefined) return { page: ref(page), skimmedAt: page.skimmedAt, changed: false, note: ['Already marked as skimmed; nothing was written.'] };
+  const next: Page = { ...page, skimmedAt: now };
+  delete next.bookmark;
+  delete next.readAt;
+  const written = await writePage(store, next, now);
+  return { page: ref(written), skimmedAt: now, changed: true, note: [SIDEPANEL_NOTE] };
 }
 
 export async function setClipNote(store: Store, input: { pageId: string; clipId: string; note: string }, now: string = new Date().toISOString()) {
