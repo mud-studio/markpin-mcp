@@ -1,7 +1,7 @@
 import YAML from 'yaml';
 import { TEMPLATE_DEFAULT, TEMPLATE_OBSIDIAN } from './presets';
 import { render, type TemplateData } from './template';
-import { CLIP_COLOR_HEX, CLIP_KIND_GLYPH, clipColorOf, clipKindOf, type Bookmark, type Clip, type Page } from './types';
+import { CLIP_COLOR_HEX, CLIP_KIND_GLYPH, clipColorOf, clipKindOf, clipPenOf, type Bookmark, type Clip, type Page } from './types';
 
 export const MARKPIN_FORMAT_VERSION = 2;
 export const MAX_FILE_BYTES = 512 * 1024;
@@ -10,7 +10,7 @@ export const MAX_FILE_BYTES = 512 * 1024;
 const FM_ORDER = ['title', 'url', 'savedAt', 'tags', 'summary', 'note', 'readAt', 'skimmedAt', 'deletedAt'] as const;
 const FM_KNOWN = new Set<string>(FM_ORDER);
 /** v2 markpin 블록(기계용). */
-const DATA_ORDER = ['id', 'rev', 'updatedAt', 'domain', 'clips', 'bookmark', 'contentTruncated'] as const;
+const DATA_ORDER = ['id', 'rev', 'updatedAt', 'domain', 'clips', 'bookmark', 'contentTruncated', 'bodyPending'] as const;
 const DATA_KNOWN = new Set<string>(['v', ...DATA_ORDER]);
 /** v1 frontmatter(읽기 전용, 2026-10-01 이전). */
 const V1_KNOWN = new Set<string>(['markpin', 'id', 'url', 'title', 'domain', 'savedAt', 'updatedAt', 'rev', 'tags', 'summary', 'note', 'readAt', 'skimmedAt', 'bookmark', 'contentTruncated', 'deletedAt', 'clips']);
@@ -36,6 +36,7 @@ export function templateData(page: Pick<Page, 'clips'> & Partial<Page>, content:
       const quoted = body ? body.split('\n').map((line) => `> ${line}`).join('\n') : '';
       const color = clipColorOf(clip);
       const kind = clipKindOf(clip);
+      const pen = clipPenOf(clip);
       const glyph = kind ? CLIP_KIND_GLYPH[kind] : '';
       // 기호=반응, 메모=이유 — 한 줄로(§21.5). 기호 없는 클립은 예전 모양 그대로.
       const noteLine = [glyph, clip.note].filter(Boolean).join(' ');
@@ -50,6 +51,10 @@ export function templateData(page: Pick<Page, 'clips'> & Partial<Page>, content:
         color,
         colorHex: CLIP_COLOR_HEX[color],
         kind: kind ?? '',
+        // 펜(2026-10-30 §5): Obsidian 프리셋이 밑줄·취소선만 구분한다. 템플릿이 모양별로 쓸 수 있게 플래그도 준다.
+        pen,
+        penIsUnderline: pen === 'underline',
+        penIsStrike: pen === 'strike',
         glyph,
         noteLine,
         // 페이지 파일은 pages/{YYYY}/ 아래에 있으므로 템플릿이 `../../`를 붙인다
@@ -85,6 +90,14 @@ export function renderBody(page: Pick<Page, 'clips'> & Partial<Page>, content: s
 }
 
 const SENTINEL = '\u0000';
+
+/** 「클립 전부 복사」(1.2.2 B6): 맨 위 `[제목](URL)` 한 줄 + 템플릿이 그린 `## Content` 앞부분. 본문은 넣지 않는다. */
+export function clipsMarkdown(page: Pick<Page, 'clips' | 'title' | 'url'> & Partial<Page>, template: string = TEMPLATE_DEFAULT): string {
+  const rendered = renderBody(page, SENTINEL, template);
+  const cut = rendered.lastIndexOf(CONTENT_MARK + '\n' + SENTINEL);
+  const clipsPart = (cut === -1 ? rendered.split(SENTINEL).join('') : rendered.slice(0, cut)).trimEnd();
+  return `[${page.title}](${page.url})\n\n${clipsPart}\n`;
+}
 
 /**
  * 본문 텍스트가 시작하는 위치. 알려진 템플릿(호출자가 준 것 → 프리셋 순)으로 본문 앞부분을 그려 보고 파일이 그대로 시작하면
@@ -271,6 +284,7 @@ export function parsePage(source: string, template?: string): Page {
   };
   assign(page, fm, ['summary', 'note', 'readAt', 'skimmedAt', 'deletedAt']);
   assign(page, data, ['bookmark', 'contentTruncated']);
+  if (data.bodyPending === true) page.bodyPending = true;
   const extra = unknownKeys(fm, FM_KNOWN);
   if (extra) page.extra = extra;
   const extraData = unknownKeys(data, DATA_KNOWN);

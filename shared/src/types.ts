@@ -28,6 +28,22 @@ export function clipKindOf(clip: { kind?: string }): ClipKind | undefined {
   return (CLIP_KINDS as readonly string[]).includes(clip.kind ?? '') ? (clip.kind as ClipKind) : undefined;
 }
 
+/**
+ * 펜 — 클립의 모양(2026-10-30 설계 §3). 색·기호와 독립. 순서 = 툴바 트레이 순서.
+ * 없으면 형광. 모르는 값(미래 문구 팩 `pack:…`)은 보존하되 형광으로 그린다.
+ */
+export const CLIP_PENS = ['highlight', 'underline', 'wavy', 'double', 'strike', 'box', 'circle', 'lasso'] as const;
+export type ClipPen = (typeof CLIP_PENS)[number];
+export const DEFAULT_CLIP_PEN: ClipPen = 'highlight';
+
+export function clipPenOf(clip: { pen?: string }): ClipPen {
+  return (CLIP_PENS as readonly string[]).includes(clip.pen ?? '') ? (clip.pen as ClipPen) : DEFAULT_CLIP_PEN;
+}
+
+/** 펜 세트(§3) — 팩이 들어올 자리. 이번 버전은 'basic' 하나이고 설정에 저장하지 않는다. */
+export type PenSet = { id: string; pens: readonly string[] };
+export const BASIC_PEN_SET: PenSet = { id: 'basic', pens: CLIP_PENS };
+
 /** 「이 글 한 줄」·메모 정규화: 공백·줄바꿈은 공백 하나로, 양끝 trim. 빈 결과는 "없음". */
 export function normalizeNote(s: string): string {
   return s.replace(/\s+/g, ' ').trim();
@@ -47,6 +63,10 @@ export type Clip = {
   color?: ClipColor;
   /** 반응 기호(§21.5). 없으면 기호 없음. 모르는 값은 보존한다. */
   kind?: ClipKind;
+  /** 펜 모양(2026-10-30 §3). 없으면 형광. 모르는 값은 보존하고 형광으로 그린다. 새 클립은 항상 명시 저장. */
+  pen?: ClipPen;
+  /** 교차 출처 iframe 안 텍스트(Claude Artifact 등, 1.2.2). 최상위 문서는 건너뛰고 하위 프레임이 앵커링한다. 없으면 최상위. */
+  frame?: true;
 };
 
 /** 읽기 책갈피(§21.2). `selectors`가 없으면 "처음부터"(나중에 읽기), 있으면 "여기부터"(읽는 중). 페이지당 1개. */
@@ -75,6 +95,8 @@ export type Page = {
   bookmark?: Bookmark;
   contentText?: string;
   contentTruncated?: boolean;
+  /** 공유(URL만)로 만들어져 본문이 아직 없다. 데스크톱 Chrome이 fetch로 채우고 지운다(spec §7.3). */
+  bodyPending?: true;
   clips: Clip[];
   deletedAt?: string;
   /** 이 버전이 모르는 frontmatter 키. 파일을 다시 쓸 때 그대로 보존한다(전방 호환, §21.2). */

@@ -1,4 +1,4 @@
-const MAX_TAG_CHARS = 24;
+export const MAX_TAG_CHARS = 24;
 
 /** 태그 하나의 표기 정규화(§8.1): trim, 앞 `#` 제거, 공백→`-`. 대소문자는 그대로 둔다. */
 export function normalizeTag(s: string): string {

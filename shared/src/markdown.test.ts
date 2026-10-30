@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_FILE_BYTES, exceedsFileLimit, fitContentToFile, parsePage, serializePage } from './markdown';
+import { MAX_FILE_BYTES, clipsMarkdown, exceedsFileLimit, fitContentToFile, parsePage, serializePage, templateData } from './markdown';
 import { TEMPLATE_DEFAULT, TEMPLATE_OBSIDIAN } from './presets';
 import { clipColorOf, clipKindOf, normalizeNote, type Clip, type Page } from './types';
 
@@ -241,6 +241,13 @@ describe('parsePage', () => {
     expect(clipKindOf(parsePage(serializePage(p)).clips[1])).toBeUndefined();
   });
 
+  it('round-trips a frame clip (1.2.2 B9)', () => {
+    const p: Page = { ...base, clips: [{ ...base.clips[0], frame: true }, region] };
+    expect(parsePage(serializePage(p))).toEqual(p);
+    expect(parsePage(serializePage(p)).clips[0].frame).toBe(true);
+    expect(parsePage(serializePage(p)).clips[1].frame).toBeUndefined();
+  });
+
   it('reads the reader note from v2 and v1 files, with yaml-special characters (§21.5)', () => {
     const p: Page = { ...base, note: 'a: b "c" #d\n둘째 줄' };
     expect(parsePage(serializePage(p))).toEqual(p);
@@ -405,6 +412,24 @@ describe('templates (§21.4)', () => {
     expect(parsePage(serializePage({ ...base, clips: [marked, noNote] }))).toEqual({ ...base, clips: [marked, noNote] });
   });
 
+  // 펜(2026-10-30 §5): Obsidian 프리셋만 밑줄·취소선을 구분, 나머지 펜은 ==. 펜 없는 클립은 위 테스트들이 그대로 통과하는 것으로 바이트 불변을 보인다.
+  it('obsidian preset renders underline as <u>, strike as ~~ and the other pens as ==', () => {
+    const u: Clip = { ...base.clips[0], id: 'u1', pen: 'underline', note: '' };
+    const s: Clip = { ...base.clips[0], id: 's1', pen: 'strike', note: '' };
+    const b: Clip = { ...base.clips[0], id: 'b1', pen: 'box', note: '' };
+    const md = serializePage({ ...base, clips: [u, s, b] }, TEMPLATE_OBSIDIAN);
+    expect(bodyOf(md)).toBe('## Clips\n\n<u>인용된 문장</u>\n\n~~인용된 문장~~\n\n==인용된 문장==\n\n## Content\n\n본문 첫 문단.\n\n본문 둘째 문단.\n');
+    expect(parsePage(md, TEMPLATE_OBSIDIAN)).toEqual({ ...base, clips: [u, s, b] });
+    // 기본 프리셋은 펜을 표현하지 않는다
+    expect(bodyOf(serializePage({ ...base, clips: [u] }))).toBe('## Clips\n\n> 인용된 문장\n\n## Content\n\n본문 첫 문단.\n\n본문 둘째 문단.\n');
+  });
+
+  it('templateData exposes pen flags per clip', () => {
+    const d = templateData({ ...base, clips: [{ ...base.clips[0], pen: 'underline' }, base.clips[0]] }, '') as { clips: Array<Record<string, unknown>> };
+    expect(d.clips[0]).toMatchObject({ pen: 'underline', penIsUnderline: true, penIsStrike: false });
+    expect(d.clips[1]).toMatchObject({ pen: 'highlight', penIsUnderline: false, penIsStrike: false });
+  });
+
   it('a custom template sees page, clip and color data', () => {
     const tpl = '{{title}}|{{#tags}}{{.}},{{/tags}}|{{#clips}}{{color}}:{{colorHex}}:{{isText}}:{{hasNote}}:{{kind}}:{{glyph}}:{{noteLine}};{{/clips}}|{{#bookmark}}{{quote}}{{/bookmark}}|{{note}}\n## Content\n\n{{content}}\n';
     const p: Page = { ...base, note: '한 줄', clips: [{ ...twoParas, kind: 'question' }], bookmark: { createdAt: '2026-09-30T01:00:00.000Z', quote: '여기' } };
@@ -429,5 +454,41 @@ describe('parsePage with non-default templates (§21.4 review)', () => {
     const tpl = '{{#clips}}{{note}}\n{{/clips}}\n## Content\n\n{{content}}\n';
     const md = serializePage(tricky, tpl);
     expect(parsePage(md, tpl)).toEqual(tricky);
+  });
+});
+
+describe('bodyPending (plan 2)', () => {
+  const T0 = '2026-09-16T10:00:00.000Z';
+  it('round-trips bodyPending=true through the data block and omits it otherwise', () => {
+    const p: Page = { id: 'aaaaaaaa-0000-4000-8000-000000000001', url: 'https://e.com/a', title: 'A', domain: 'e.com', savedAt: T0, updatedAt: T0, rev: 1, tags: [], clips: [], bodyPending: true };
+    const text = serializePage(p);
+    expect(text).toContain('"bodyPending":true');
+    expect(parsePage(text).bodyPending).toBe(true);
+    const { bodyPending: _b, ...without } = p;
+    const text2 = serializePage(without);
+    expect(text2).not.toContain('bodyPending');
+    expect(parsePage(text2).bodyPending).toBeUndefined();
+  });
+  it('ignores non-true bodyPending values when parsing', () => {
+    const p: Page = { id: 'aaaaaaaa-0000-4000-8000-000000000001', url: 'https://e.com/a', title: 'A', domain: 'e.com', savedAt: T0, updatedAt: T0, rev: 1, tags: [], clips: [] };
+    const text = serializePage(p).replace('"domain":"e.com"', '"domain":"e.com","bodyPending":"yes"');
+    expect(parsePage(text).bodyPending).toBeUndefined();
+  });
+});
+
+describe('clipsMarkdown (1.2.2 B6)', () => {
+  it('puts a title link first and the default template clips, without the page content', () => {
+    expect(clipsMarkdown(base)).toBe('[예시 글 제목](https://example.com/article)\n\n## Clips\n\n> 인용된 문장\n\n내 메모\n');
+  });
+  it('follows the Obsidian preset', () => {
+    const out = clipsMarkdown(base, TEMPLATE_OBSIDIAN);
+    expect(out).toBe('[예시 글 제목](https://example.com/article)\n\n## Clips\n\n==인용된 문장==\n\n내 메모\n');
+  });
+  it('never includes the content section, even with a custom template', () => {
+    const custom = '# {{title}}\n\n{{#clips}}- {{text}}\n{{/clips}}\n## Content\n\n{{content}}\n';
+    const out = clipsMarkdown(base, custom);
+    expect(out).toContain('- 인용된 문장');
+    expect(out).not.toContain('본문 첫 문단');
+    expect(out).not.toContain('## Content');
   });
 });

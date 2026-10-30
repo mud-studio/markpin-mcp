@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { type Bookmark, type Clip, type ClipColor, type ClipKind, DEFAULT_CLIP_COLOR, MAX_CLIP_TEXT_CHARS, type Page, type Selector, bookmarkQuote, extractDomain, normalizeNote, normalizeUrl } from '@markpin/shared';
+import { type Bookmark, type Clip, type ClipColor, type ClipKind, type ClipPen, DEFAULT_CLIP_COLOR, DEFAULT_CLIP_PEN, MAX_CLIP_TEXT_CHARS, type Page, type Selector, bookmarkQuote, extractDomain, normalizeNote, normalizeUrl } from '@markpin/shared';
 import { safeNormalize, type Store } from './store';
-import { normalizeTag, normalizeTags } from './tags';
+import { MAX_TAG_CHARS, normalizeTag, normalizeTags } from './tags';
 import { writePage } from './write';
 
 export type PageRef = { id: string; title: string };
@@ -60,7 +60,10 @@ export async function savePage(
     title: title ?? base.title,
     tags: [...base.tags, ...normalizeTags(input.tags ?? [], base.tags).filter((t) => !base.tags.includes(t))]
   };
-  if (content) page.contentText = content;
+  if (content) {
+    page.contentText = content;
+    delete page.bodyPending; // 본문을 넣었으니 확장이 다시 채울 필요가 없다
+  }
   if (summary) page.summary = summary;
   const written = await writePage(store, page, now);
   const note = [store.inbox ? INBOX_NOTE : SIDEPANEL_NOTE];
@@ -94,6 +97,53 @@ export async function updateTags(store: Store, input: { ids: string[]; add?: str
   return { pages, missing, note: pages.length > 0 ? [SIDEPANEL_NOTE] : ['No tags changed.'] };
 }
 
+export type RetagChange = { from: string; to?: string };
+export type RetagPlan = { items: Array<{ from: string; to: string | null; pages: number }>; targets: Map<string, string[]> };
+
+/**
+ * 태그 병합·이름 변경·삭제 계획(0.10.0 §2.1). 살아 있는 페이지 전부에 항목을 순서대로 누적 적용한다.
+ * 비교는 대소문자 무시, 쓰는 값은 normalizeTag(to). 대소문자만 다른 변경(React → react)도 적용한다(확장 planRename과 같다).
+ * `from === to`(정확히 같음)는 no-op. `to`가 정규화 뒤 비거나 24자를 넘으면 전체를 거부한다(검증 실패와 같은 급, 아무것도 쓰지 않는다).
+ */
+export function planRetag(store: Store, changes: RetagChange[]): RetagPlan {
+  const items = changes.map((c) => {
+    const to = c.to === undefined ? null : normalizeTag(c.to);
+    if (to !== null && (!to || to.length > MAX_TAG_CHARS)) throw new Error(`Invalid tag: ${JSON.stringify(c.to)}`);
+    // `from`도 planTags처럼 정규화해 비교한다('#react'·'react js' → 'react'·'react-js'). 보여 주는 값은 입력 그대로.
+    return { from: c.from, to, pages: 0, fromLower: normalizeTag(c.from).toLowerCase() };
+  });
+  const targets = new Map<string, string[]>();
+  const same = (a: string[], b: string[]) => a.length === b.length && a.every((t, i) => t === b[i]);
+  for (const page of store.pages.values()) {
+    let tags = page.tags;
+    for (const item of items) {
+      if (!item.fromLower || normalizeTag(item.from) === item.to) continue;
+      const at = tags.findIndex((t) => t.toLowerCase() === item.fromLower);
+      if (at < 0) continue;
+      const kept = tags.filter((t) => t.toLowerCase() !== item.fromLower);
+      // 이름 변경은 제자리(순서 유지), 병합(to가 이미 있음)·삭제는 빼기만
+      const next = item.to !== null && !kept.some((t) => t.toLowerCase() === item.to!.toLowerCase()) ? [...kept.slice(0, at), item.to, ...kept.slice(at)] : kept;
+      if (same(next, tags)) continue; // 이미 목표 표기(대소문자만 다른 변경에서 이미 바뀐 페이지)는 세지 않는다
+      item.pages += 1;
+      tags = next;
+    }
+    if (!same(tags, page.tags)) targets.set(page.id, tags);
+  }
+  return { items: items.map(({ from, to, pages }) => ({ from, to, pages })), targets };
+}
+
+export async function retag(store: Store, changes: RetagChange[], now: string = new Date().toISOString()) {
+  const plan = planRetag(store, changes);
+  const pages: Array<PageRef & { before: string[]; after: string[] }> = [];
+  for (const [id, after] of plan.targets) {
+    const page = store.pages.get(id);
+    if (!page) continue;
+    const written = await writePage(store, { ...page, tags: after }, now);
+    pages.push({ ...ref(written), before: page.tags, after: written.tags });
+  }
+  return { changes: plan.items, pages, note: pages.length > 0 ? [SIDEPANEL_NOTE] : ['No tags changed.'] };
+}
+
 /** 본문에서 `text`를 찾아 앞뒤 문맥을 붙인 TextQuoteSelector. 못 찾으면 exact만(재방문 때 앵커링 실패 가능). */
 function quoteSelector(page: Page, text: string): { selector: Extract<Selector, { type: 'TextQuoteSelector' }>; anchored: boolean } {
   const selector: Extract<Selector, { type: 'TextQuoteSelector' }> = { type: 'TextQuoteSelector', exact: text };
@@ -111,13 +161,13 @@ function quoteSelector(page: Page, text: string): { selector: Extract<Selector, 
 
 const NOT_ANCHORED_NOTE = 'The text was not found in the saved content, so it may not be highlighted when the page is revisited.';
 
-export async function addClip(store: Store, input: { pageId: string; text: string; note?: string; color?: ClipColor; kind?: ClipKind }, now: string = new Date().toISOString()) {
+export async function addClip(store: Store, input: { pageId: string; text: string; note?: string; color?: ClipColor; kind?: ClipKind; pen?: ClipPen }, now: string = new Date().toISOString()) {
   const page = requirePage(store, input.pageId);
   const text = input.text.trim();
   if (!text) throw new Error('Clip text is empty');
   if (text.length > MAX_CLIP_TEXT_CHARS) throw new Error(`Clip text exceeds ${MAX_CLIP_TEXT_CHARS} characters`);
   const { selector: quote, anchored } = quoteSelector(page, text);
-  const clip: Clip = { id: randomUUID(), type: 'text', createdAt: now, updatedAt: now, text, note: input.note ?? '', selectors: [quote], color: input.color ?? DEFAULT_CLIP_COLOR, ...(input.kind ? { kind: input.kind } : {}) };
+  const clip: Clip = { id: randomUUID(), type: 'text', createdAt: now, updatedAt: now, text, note: input.note ?? '', selectors: [quote], color: input.color ?? DEFAULT_CLIP_COLOR, pen: input.pen ?? DEFAULT_CLIP_PEN, ...(input.kind ? { kind: input.kind } : {}) };
   const written = await writePage(store, { ...page, clips: [...page.clips, clip] }, now);
   const note = [SIDEPANEL_NOTE];
   if (!anchored) note.push(NOT_ANCHORED_NOTE);

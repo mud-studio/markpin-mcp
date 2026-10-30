@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { confirmLabel, confirmMessage, type Change } from './messages';
+import { batchHeader, confirmLabel, confirmMessage, type Change } from './messages';
 import { LANGS } from './cli';
 
 describe('confirmMessage', () => {
@@ -41,6 +41,8 @@ describe('confirmMessage', () => {
   it('has labels in both languages', () => {
     expect(confirmLabel('ko').title).toBe('진행');
     expect(confirmLabel('en').title).toBe('Proceed');
+    expect(confirmLabel('ko').trust.title).toBe('이 연결 동안 묻지 않기');
+    expect(confirmLabel('en').trust.title).toBe("Don't ask again on this connection");
   });
   it('describes each change in the five added languages', () => {
     const tags = { kind: 'update_tags' as const, titles: ['React Docs'], add: ['frontend'], remove: [] };
@@ -54,6 +56,7 @@ describe('confirmMessage', () => {
 
     expect(confirmMessage('ja', { kind: 'save_page', title: 'A', url: 'https://e.com/a' })).toBe("'A'（https://e.com/a）をMarkpinに保存しますか？");
     expect(confirmMessage('ja', { kind: 'delete_pages', titles: ['A', 'B', 'C', 'D'] })).toBe("'A', 'B', 'C' 他1件を削除しますか？（30日以内なら復元できます）");
+    expect(confirmMessage('ja', { kind: 'retag', items: [{ from: 'a', to: 'b', pages: 2 }, { from: 'c', to: null, pages: 1 }] })).toBe("タグを変更しますか？ 'a' → 'b'（2件）、'c' を削除（1件）");
     expect(confirmMessage('es', { kind: 'add_clip', title: 'A', text: 'x' })).toBe("¿Añadir el clip \"x\" a 'A'?");
     expect(confirmMessage('pt-BR', { kind: 'add_clip', title: 'A', text: 'x' })).toBe("Adicionar o clipe \"x\" em 'A'?");
     expect(confirmMessage('pt-BR', { kind: 'set_clip_note', title: 'A', note: '' })).toBe("Apagar a nota do clipe em 'A'?");
@@ -72,6 +75,17 @@ describe('confirmMessage', () => {
     expect(confirmMessage('en', { kind: 'set_bookmark', title: 'A', quote: 'from here' })).toBe(`Bookmark 'A' at "from here"?`);
     expect(confirmMessage('en', { kind: 'mark_read', title: 'A' })).toBe("Mark 'A' as read?");
   });
+  it('describes a retag with every item listed, in Korean and English', () => {
+    const c: Change = { kind: 'retag', items: [{ from: 'react-js', to: 'react', pages: 12 }, { from: 'ts', to: 'typescript', pages: 4 }, { from: 'old', to: null, pages: 2 }] };
+    expect(confirmMessage('ko', c)).toBe("태그 'react-js' → 'react'(12개), 'ts' → 'typescript'(4개), 'old' 삭제(2개)로 바꿀까요?");
+    expect(confirmMessage('en', c)).toBe("Change tags: 'react-js' → 'react' (12 pages), 'ts' → 'typescript' (4 pages), remove 'old' (2 pages)?");
+    for (const lang of LANGS) {
+      const m = confirmMessage(lang, c);
+      expect(m, lang).toContain("'react-js'");
+      expect(m, lang).toContain("'old'");
+      expect(m, lang).toContain('12');
+    }
+  });
   it('every language renders every kind non-empty and names the title', () => {
     const kinds: Change[] = [
       { kind: 'save_page', title: 'T', url: 'https://e.com' },
@@ -89,12 +103,28 @@ describe('confirmMessage', () => {
       { kind: 'set_bookmark', title: 'T', quote: 'q' },
       { kind: 'clear_bookmark', title: 'T' },
       { kind: 'mark_read', title: 'T' },
-      { kind: 'mark_skimmed', title: 'T' }
+      { kind: 'mark_skimmed', title: 'T' },
+      { kind: 'retag', items: [{ from: 'T', to: 'U', pages: 1 }] }
     ];
     for (const lang of LANGS) {
       for (const c of kinds) expect(confirmMessage(lang, c), `${lang} ${c.kind}`).toContain("'T'");
       expect(confirmLabel(lang).title).not.toBe('');
       expect(confirmLabel(lang).description).not.toBe('');
+      expect(confirmLabel(lang).trust.title).not.toBe('');
+      expect(confirmLabel(lang).trust.description).not.toBe('');
+    }
+  });
+});
+
+describe('batchHeader', () => {
+  it('ko/en', () => {
+    expect(batchHeader('ko', 3)).toBe('다음 3개를 적용할까요?');
+    expect(batchHeader('en', 3)).toBe('Apply these 3 changes?');
+  });
+  it('every language carries the count', () => {
+    for (const lang of LANGS) {
+      expect(batchHeader(lang, 12), lang).toContain('12');
+      expect(batchHeader(lang, 12), lang).not.toBe('');
     }
   });
 });

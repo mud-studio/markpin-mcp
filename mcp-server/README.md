@@ -1,6 +1,6 @@
 # @markpin/mcp
 
-MCP server for a [Markpin](https://markpin.dev) folder. Markpin is a Chrome extension that saves web pages and clips as Markdown files in a folder you own — this server lets an AI client (Claude Code, Claude Desktop, Cursor, …) search and read those files, and optionally edit them with your confirmation.
+MCP server for a [Markpin](https://markpin.dev) folder. Markpin is a Chrome extension that saves web pages and clips as Markdown files in a folder you own — this server lets an AI client (Claude Code, Claude Desktop, Cursor, Codex, Gemini CLI, VS Code, Windsurf, Zed, or any other MCP client) search and read those files, and optionally edit them with your confirmation.
 
 - Read-only by default. Writes need `--allow-write` and a confirmation dialog for every change.
 - Runs locally over stdio. Nothing leaves your computer.
@@ -22,7 +22,7 @@ Options:
 | Flag | Meaning |
 |---|---|
 | `--dir <path>` | Required. The Markpin folder (the one that contains `pages/`). `~` is expanded. |
-| `--allow-write` | Registers the ten write tools. Without it the server is read-only. |
+| `--allow-write` | Registers the fourteen write tools. Without it the server is read-only. |
 | `--lang ko\|en\|ja\|es\|pt-BR\|de\|fr` | Language of the confirmation dialog. Default: taken from your system locale (`pt*` → `pt-BR`), otherwise `en`. The Markpin extension's setup guide fills this in from your Chrome language. |
 
 On success the server logs `serving N pages from <dir>` to stderr. stdout carries the MCP protocol, so all logs go to stderr — that line is the quickest way to check the path.
@@ -96,6 +96,54 @@ Restart Claude Desktop. The hammer/plug icon in the chat box lists the Markpin t
 
 Add the same JSON to `~/.cursor/mcp.json` (all projects) or `.cursor/mcp.json` (one project), then enable the server in Cursor Settings → MCP.
 
+### Codex (CLI, IDE extension, ChatGPT desktop)
+
+```bash
+codex mcp add markpin -- npx -y @markpin/mcp --dir "/path/to/Markpin"
+```
+
+All three share `~/.codex/config.toml`. Check with `codex mcp list`.
+
+### Gemini CLI
+
+```bash
+gemini mcp add markpin npx -- -y @markpin/mcp --dir "/path/to/Markpin"
+```
+
+Server flags go after `--` so Gemini doesn't read them as its own options. Saved to `~/.gemini/settings.json`; check with `gemini mcp list`.
+
+### VS Code (Copilot agent mode)
+
+`.vscode/mcp.json` in the project, or the user `mcp.json` opened by **MCP: Open User Configuration**. Note the key is `servers` and stdio needs `type`:
+
+```json
+{
+  "servers": {
+    "markpin": { "type": "stdio", "command": "npx", "args": ["-y", "@markpin/mcp", "--dir", "/path/to/Markpin"] }
+  }
+}
+```
+
+### Windsurf
+
+Same JSON as Claude Desktop (`mcpServers`) in `~/.codeium/windsurf/mcp_config.json` (Windows: `%USERPROFILE%\.codeium\windsurf\mcp_config.json`), then refresh under Settings → MCP.
+
+### Zed
+
+`~/.config/zed/settings.json` (Windows: `%APPDATA%\Zed\settings.json`). The key is `context_servers`, hand-added servers need `source: "custom"`, and the command is nested:
+
+```json
+{
+  "context_servers": {
+    "markpin": { "source": "custom", "command": { "path": "npx", "args": ["-y", "@markpin/mcp", "--dir", "/path/to/Markpin"] } }
+  }
+}
+```
+
+### Any other MCP client
+
+Anything that speaks MCP over stdio works. Paste the same command (`npx`) and args (`-y @markpin/mcp --dir …`) into that client's MCP settings. On Windows, clients that spawn without a shell need `cmd /c npx …` (see the Claude Desktop note above).
+
 ## File format
 
 Each page is one Markdown file. The frontmatter holds only the human-facing keys (`title`, `url`, `savedAt`, `tags`, `summary`, `readAt`, `deletedAt`) so note apps such as Obsidian show a clean Properties panel. Everything Markpin needs internally (`id`, `rev`, `updatedAt`, clips with their anchors, bookmark) lives in a one-line JSON block at the very end of the file:
@@ -112,11 +160,13 @@ The extension writes `markpin.json` at the folder root when you pick a Markdown 
 
 ## Read-only vs. `--allow-write`
 
-Without `--allow-write` the server exposes four read tools and cannot change any file. With it, ten write tools are added. Every write passes three gates:
+Without `--allow-write` the server exposes four read tools and cannot change any file. With it, fourteen write tools are added. Every write passes three gates:
 
 1. **The flag.** You decided at registration time that writes are allowed at all.
 2. **Client permission.** The tools are marked non-read-only (`delete_pages` as destructive), so clients such as Claude Code ask before each call.
-3. **Your confirmation.** If the client supports MCP elicitation (Claude Code does), the server shows a dialog describing the exact change — for example *"Add tag frontend to 'React Docs'?"* — and writes only when you accept. If the client cannot show that dialog, the result carries `"gate": "client"` so the assistant can tell you that the client's own prompt was the only confirmation.
+3. **Your confirmation.** If the client supports MCP elicitation (Claude Code does), the server shows a dialog describing the exact change — for example *"Add tag frontend to 'React Docs'?"* — and writes only when you accept. The dialog also has a checkbox, *Don't ask again on this connection*: tick it with your confirmation and later writes on that connection (including `delete_pages`) are applied without the dialog and carry `"gate": "trusted"`; it resets when the client restarts, and the client's own permission prompts are unaffected. If the client cannot show that dialog, the result carries `"gate": "client"` so the assistant can tell you that the client's own prompt was the only confirmation.
+
+When one request needs several writes — merging tags, clipping three passages — the assistant is told to use `retag` or `batch` so you confirm once with a numbered list instead of once per write.
 
 The confirmation waits up to 10 minutes. A `save_page` fetch happens only after you accept, so a declined URL is never requested.
 
@@ -137,7 +187,9 @@ Write (`--allow-write`):
 |---|---|
 | `save_page` | Saves a URL as a new page (fetches and extracts the article unless you pass `content`). Takes an optional `summary` (one or two sentences) and `tags` — the assistant is asked to supply both whenever it has read the page, since Markpin's built-in AI only runs for pages saved from the browser. One page per URL — an existing page is returned unchanged. |
 | `update_tags` | Adds and/or removes tags on one or more pages. |
-| `add_clip` | Adds a quoted text clip, with an optional note, highlight `color` (amber, green, blue, pink) and reaction mark `kind` (question, insight, disagree, star), to a page. |
+| `retag` | Renames, merges or removes tags across every page in one confirmation: `changes: [{ from, to? }]`, applied in order; omit `to` to remove the tag. Matching ignores case. |
+| `batch` | Runs up to 50 write tools (any except `batch`) in order after one confirmation that lists every change. Every op is validated and planned first; one bad op rejects the whole batch. Stops at the first failure and returns each op's result plus `completed`; an op that would change nothing is not run and comes back as `skipped: true`. Ops must reference pages that already exist. |
+| `add_clip` | Adds a quoted text clip, with an optional note, highlight `color` (amber, green, blue, pink), reaction mark `kind` (question, insight, disagree, star) and `pen` shape (highlight, underline, wavy, double, strike, box, circle, lasso), to a page. |
 | `set_clip_note` | Replaces the note on a clip (empty clears it). |
 | `set_summary` | Replaces a page's summary (empty clears it). Handy for pages saved without one. |
 | `set_note` | Sets the reader's own one-line note on a page (frontmatter `note`; empty clears it). |
@@ -148,7 +200,7 @@ Write (`--allow-write`):
 | `clear_bookmark` | Removes the bookmark without marking the page read. |
 | `mark_read` | Marks a page as read and removes its bookmark. |
 
-Every write returns a `note` and a `gate` field (`"elicitation"` when you confirmed in the dialog, `"client"` when only the client's prompt stood between the assistant and the write). `update_tags`, `set_clip_note`, `set_summary` and `set_note` also return `before`/`after`; the others return the affected page(s).
+Every write returns a `note` and a `gate` field (`"elicitation"` when you confirmed in the dialog, `"trusted"` when you had ticked *Don't ask again on this connection*, `"client"` when only the client's prompt stood between the assistant and the write). `update_tags`, `retag`, `set_clip_note`, `set_summary` and `set_note` also return `before`/`after`; the others return the affected page(s). `batch` returns `{ results, completed, gate }`, where `results` lists each op in order as `{ tool, ok: true, result }`, `{ tool, ok: true, skipped: true }` or `{ tool, ok: false, error }` (nothing after a failed op), and `completed` counts the ops that ran and succeeded.
 
 ## Limits
 
@@ -172,6 +224,7 @@ Every write returns a `note` and a `gate` field (`"elicitation"` when you confir
 | A page saved by the assistant has no summary or tags | The assistant saved it without reading the page. Ask it to write the summary and tags (`set_summary`, `update_tags`). |
 | `Not an HTML page` / the server cannot fetch a URL | The site blocks bots or needs a login. Ask the assistant to read the page itself and pass `content` to `save_page`. |
 | `User declined` / `No response to the confirmation` | You declined the dialog, or it timed out after 10 minutes. Nothing was written. |
+| `ops[n]: …` from `batch` | Op number `n` (from 0) named an unknown tool, had bad arguments, or referred to a missing page or clip. The whole batch was rejected before asking you; nothing was written. |
 
 ## Development
 

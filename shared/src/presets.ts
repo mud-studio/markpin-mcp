@@ -6,11 +6,14 @@
  */
 export const TEMPLATE_DEFAULT = '## Clips\n\n{{#clips}}{{block}}{{^last}}\n{{/last}}{{/clips}}\n## Content\n\n{{content}}\n';
 
-/** Obsidian: 텍스트 클립은 단락마다 `==…==`(하이라이트는 단락을 못 넘는다), 영역 클립은 `[!quote]` 콜아웃. 색은 표현하지 않고, 기호는 메모 줄 앞에(`noteLine`, §21.5). */
+/**
+ * Obsidian: 텍스트 클립은 단락마다 `==…==`(하이라이트는 단락을 못 넘는다), 영역 클립은 `[!quote]` 콜아웃. 색은 표현하지 않고, 기호는 메모 줄 앞에(`noteLine`, §21.5).
+ * 펜(2026-10-30 §5): 밑줄 펜은 `<u>…</u>`, 취소선 펜은 `~~…~~`, 나머지 펜은 `==…==` — 단락 안에서 클립 스코프의 `penIsUnderline`·`penIsStrike`를 본다.
+ */
 export const TEMPLATE_OBSIDIAN =
   '## Clips\n\n' +
   '{{#clips}}' +
-  '{{#isText}}{{#paragraphs}}=={{.}}==\n\n{{/paragraphs}}{{/isText}}' +
+  '{{#isText}}{{#paragraphs}}{{#penIsUnderline}}<u>{{.}}</u>{{/penIsUnderline}}{{#penIsStrike}}~~{{.}}~~{{/penIsStrike}}{{^penIsUnderline}}{{^penIsStrike}}=={{.}}=={{/penIsStrike}}{{/penIsUnderline}}\n\n{{/paragraphs}}{{/isText}}' +
   '{{#isRegion}}> [!quote]\n{{#image}}> ![](../../{{image}})\n>\n{{/image}}{{quoted}}\n\n{{/isRegion}}' +
   '{{#noteLine}}{{noteLine}}\n\n{{/noteLine}}' +
   '{{/clips}}{{^clips}}\n{{/clips}}' +

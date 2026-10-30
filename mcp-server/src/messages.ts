@@ -14,7 +14,9 @@ export type Change =
   | { kind: 'set_bookmark'; title: string; quote?: string }
   | { kind: 'clear_bookmark'; title: string }
   | { kind: 'mark_read'; title: string }
-  | { kind: 'mark_skimmed'; title: string };
+  | { kind: 'mark_skimmed'; title: string }
+  // 태그 병합·이름 변경·삭제(0.10.0 §2.1) — 항목을 전부 나열한다(제목처럼 3개에서 자르지 않는다)
+  | { kind: 'retag'; items: Array<{ from: string; to: string | null; pages: number }> };
 
 const MAX_TITLES = 3;
 const MAX_TEXT = 40;
@@ -36,6 +38,11 @@ const quoteTitles = (titles: string[], lang: Lang): string => {
   return `${shown} ${MORE[lang](rest)}`;
 };
 const clip = (s: string) => (s.length > MAX_TEXT ? `${s.slice(0, MAX_TEXT)}…` : s);
+
+type RetagItem = Extract<Change, { kind: 'retag' }>['items'][number];
+/** retag 항목 나열: `'a' → 'b'(12개)`처럼 `rename(from,to,n)`, 삭제는 `remove(from,n)`. */
+const retagList = (items: RetagItem[], rename: (from: string, to: string, n: number) => string, remove: (from: string, n: number) => string, sep = ', '): string =>
+  items.map((i) => (i.to === null ? remove(i.from, i.pages) : rename(i.from, i.to, i.pages))).join(sep);
 
 /**
  * 마지막 글자에 맞는 조사를 고른다. 한글 음절(U+AC00–U+D7A3)이면 종성 유무로,
@@ -70,6 +77,7 @@ function ko(c: Change): string {
     case 'clear_bookmark': return `'${c.title}'의 책갈피를 뺄까요?`;
     case 'mark_read': return `'${c.title}'${josa(c.title, '을', '를')} 읽음으로 표시할까요?`;
     case 'mark_skimmed': return `'${c.title}'${josa(c.title, '을', '를')} 훑어봄으로 표시할까요?`;
+    case 'retag': return `태그 ${retagList(c.items, (f, t, n) => `'${f}' → '${t}'(${n}개)`, (f, n) => `'${f}' 삭제(${n}개)`)}로 바꿀까요?`;
   }
   const exhaustive: never = c;
   return exhaustive;
@@ -94,6 +102,7 @@ function en(c: Change): string {
     case 'clear_bookmark': return `Remove the bookmark from '${c.title}'?`;
     case 'mark_read': return `Mark '${c.title}' as read?`;
     case 'mark_skimmed': return `Mark '${c.title}' as skimmed?`;
+    case 'retag': return `Change tags: ${retagList(c.items, (f, t, n) => `'${f}' → '${t}' (${n} page${n === 1 ? '' : 's'})`, (f, n) => `remove '${f}' (${n} page${n === 1 ? '' : 's'})`)}?`;
   }
   const exhaustive: never = c;
   return exhaustive;
@@ -117,6 +126,7 @@ function ja(c: Change): string {
     case 'clear_bookmark': return `'${c.title}'のしおりを外しますか？`;
     case 'mark_read': return `'${c.title}'を読了にしますか？`;
     case 'mark_skimmed': return `'${c.title}'を流し読みにしますか？`;
+    case 'retag': return `タグを変更しますか？ ${retagList(c.items, (f, t, n) => `'${f}' → '${t}'（${n}件）`, (f, n) => `'${f}' を削除（${n}件）`, '、')}`;
   }
   const exhaustive: never = c;
   return exhaustive;
@@ -136,6 +146,7 @@ function es(c: Change): string {
     case 'clear_bookmark': return `¿Quitar el marcapáginas de '${c.title}'?`;
     case 'mark_read': return `¿Marcar '${c.title}' como leído?`;
     case 'mark_skimmed': return `¿Marcar '${c.title}' como ojeado?`;
+    case 'retag': return `¿Cambiar las etiquetas? ${retagList(c.items, (f, t, n) => `'${f}' → '${t}' (${n} página${n === 1 ? '' : 's'})`, (f, n) => `quitar '${f}' (${n} página${n === 1 ? '' : 's'})`)}.`;
   }
   const exhaustive: never = c;
   return exhaustive;
@@ -155,6 +166,7 @@ function ptBR(c: Change): string {
     case 'clear_bookmark': return `Remover o marcador de '${c.title}'?`;
     case 'mark_read': return `Marcar '${c.title}' como lido?`;
     case 'mark_skimmed': return `Marcar '${c.title}' como folheado?`;
+    case 'retag': return `Alterar as tags? ${retagList(c.items, (f, t, n) => `'${f}' → '${t}' (${n} página${n === 1 ? '' : 's'})`, (f, n) => `remover '${f}' (${n} página${n === 1 ? '' : 's'})`)}.`;
   }
   const exhaustive: never = c;
   return exhaustive;
@@ -174,6 +186,7 @@ function de(c: Change): string {
     case 'clear_bookmark': return `Lesezeichen aus '${c.title}' entfernen?`;
     case 'mark_read': return `'${c.title}' als gelesen markieren?`;
     case 'mark_skimmed': return `'${c.title}' als überflogen markieren?`;
+    case 'retag': return `Tags ändern? ${retagList(c.items, (f, t, n) => `'${f}' → '${t}' (${n} Seite${n === 1 ? '' : 'n'})`, (f, n) => `'${f}' entfernen (${n} Seite${n === 1 ? '' : 'n'})`)}.`;
   }
   const exhaustive: never = c;
   return exhaustive;
@@ -193,6 +206,7 @@ function fr(c: Change): string {
     case 'clear_bookmark': return `Retirer le marque-page de '${c.title}' ?`;
     case 'mark_read': return `Marquer '${c.title}' comme lu ?`;
     case 'mark_skimmed': return `Marquer '${c.title}' comme parcouru ?`;
+    case 'retag': return `Modifier les tags ? ${retagList(c.items, (f, t, n) => `'${f}' → '${t}' (${n} page${n === 1 ? '' : 's'})`, (f, n) => `retirer '${f}' (${n} page${n === 1 ? '' : 's'})`)}.`;
   }
   const exhaustive: never = c;
   return exhaustive;
@@ -204,16 +218,55 @@ export function confirmMessage(lang: Lang, c: Change): string {
   return RENDER[lang](c);
 }
 
-const LABEL: Record<Lang, { title: string; description: string }> = {
-  ko: { title: '진행', description: '이 변경을 Markpin 폴더에 기록합니다.' },
-  en: { title: 'Proceed', description: 'Write this change to your Markpin folder.' },
-  ja: { title: '実行', description: 'この変更をMarkpinフォルダに書き込みます。' },
-  es: { title: 'Continuar', description: 'Este cambio se escribirá en tu carpeta de Markpin.' },
-  'pt-BR': { title: 'Continuar', description: 'Esta alteração será gravada na sua pasta do Markpin.' },
-  de: { title: 'Fortfahren', description: 'Diese Änderung wird in deinen Markpin-Ordner geschrieben.' },
-  fr: { title: 'Continuer', description: 'Cette modification sera écrite dans votre dossier Markpin.' }
+export type ConfirmLabel = { title: string; description: string; trust: { title: string; description: string } };
+
+/** 확인 폼 라벨. `trust`는 「이 연결 동안 묻지 않기」 체크박스(0.10.0 §2.3) — 클라이언트 연결이 끝날 때까지만, 서버 재시작이면 다시 묻는다. */
+const LABEL: Record<Lang, ConfirmLabel> = {
+  ko: {
+    title: '진행', description: '이 변경을 Markpin 폴더에 기록합니다.',
+    trust: { title: '이 연결 동안 묻지 않기', description: '이 클라이언트 연결이 끝날 때까지 쓰기를 확인 없이 적용합니다. 클라이언트 자체의 권한 창은 그대로입니다.' }
+  },
+  en: {
+    title: 'Proceed', description: 'Write this change to your Markpin folder.',
+    trust: { title: "Don't ask again on this connection", description: "Apply writes without this confirmation until the client disconnects. The client's own permission prompts are unaffected." }
+  },
+  ja: {
+    title: '実行', description: 'この変更をMarkpinフォルダに書き込みます。',
+    trust: { title: 'この接続中は確認しない', description: 'クライアントの接続が終わるまで、書き込みをこの確認なしで適用します。クライアント自体の権限ダイアログはそのままです。' }
+  },
+  es: {
+    title: 'Continuar', description: 'Este cambio se escribirá en tu carpeta de Markpin.',
+    trust: { title: 'No volver a preguntar en esta conexión', description: 'Aplica las escrituras sin esta confirmación hasta que el cliente se desconecte. Los permisos propios del cliente no cambian.' }
+  },
+  'pt-BR': {
+    title: 'Continuar', description: 'Esta alteração será gravada na sua pasta do Markpin.',
+    trust: { title: 'Não perguntar de novo nesta conexão', description: 'Aplica as gravações sem esta confirmação até o cliente desconectar. As permissões do próprio cliente continuam iguais.' }
+  },
+  de: {
+    title: 'Fortfahren', description: 'Diese Änderung wird in deinen Markpin-Ordner geschrieben.',
+    trust: { title: 'Für diese Verbindung nicht mehr fragen', description: 'Schreibvorgänge werden ohne diese Bestätigung übernommen, bis der Client die Verbindung trennt. Die Berechtigungsabfragen des Clients selbst bleiben bestehen.' }
+  },
+  fr: {
+    title: 'Continuer', description: 'Cette modification sera écrite dans votre dossier Markpin.',
+    trust: { title: 'Ne plus demander pour cette connexion', description: "Les écritures sont appliquées sans cette confirmation jusqu'à la déconnexion du client. Les demandes d'autorisation du client lui-même restent inchangées." }
+  }
 };
 
-export function confirmLabel(lang: Lang): { title: string; description: string } {
+/** batch 확인 문장 머리말(0.10.0 §2.2). 아래에 `1. …` 번호 목록이 붙는다. */
+const BATCH_HEADER: Record<Lang, (n: number) => string> = {
+  ko: (n) => `다음 ${n}개를 적용할까요?`,
+  en: (n) => `Apply these ${n} changes?`,
+  ja: (n) => `次の${n}件を適用しますか？`,
+  es: (n) => `¿Aplicar estos ${n} cambios?`,
+  'pt-BR': (n) => `Aplicar estas ${n} alterações?`,
+  de: (n) => `Diese ${n} Änderungen anwenden?`,
+  fr: (n) => `Appliquer ces ${n} modifications ?`
+};
+
+export function batchHeader(lang: Lang, n: number): string {
+  return BATCH_HEADER[lang](n);
+}
+
+export function confirmLabel(lang: Lang): ConfirmLabel {
   return LABEL[lang];
 }
