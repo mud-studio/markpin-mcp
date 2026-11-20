@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Page } from './types';
-import { buildIndex, snippetFor, toDoc } from './search';
+import { vi } from 'vitest';
+import { buildIndex, createIndex, snippetFor, syncIndex, toDoc } from './search';
 
 const mk = (id: string, over: Partial<Page>): Page => ({
   id, url: `https://e.com/${id}`, title: id, domain: 'e.com',
@@ -84,5 +85,45 @@ describe('snippetFor', () => {
   it('has no ellipsis when the text is short', () => {
     const p = mk('f', { contentText: 'short text here' });
     expect(snippetFor(p, ['text'])).toEqual({ source: 'content', before: 'short ', hit: 'text', after: ' here' });
+  });
+});
+
+describe('syncIndex (사이드패널 규모 3)', () => {
+  const base = [
+    mk('p1', { title: '사과 이야기', contentText: '빨간 사과' }),
+    mk('p2', { title: '바나나', contentText: '노란 바나나 사과' }),
+    mk('p3', { title: '체리', tags: ['과일'] }),
+    mk('p4', { title: '포도', contentText: '사과 아님' }),
+    mk('p5', { title: '수박', note: '여름 과일' })
+  ];
+  const ids = (index: ReturnType<typeof buildIndex>, q: string) => index.search(q).map((r) => r.id as string);
+
+  it('matches a full rebuild after edits, deletes, adds and tombstones', () => {
+    const index = createIndex();
+    const sigs = new Map<string, string>();
+    syncIndex(index, sigs, base);
+    const next = [
+      { ...base[0], title: '배 이야기', rev: 2, updatedAt: '2026-01-02T00:00:00.000Z' }, // 제목 수정
+      base[1],
+      // p3 삭제(목록에서 빠짐 — tombstone도 listPages에 안 나온다)
+      { ...base[3], contentText: '과일 사과', rev: 2, updatedAt: '2026-01-02T00:00:00.000Z' },
+      base[4],
+      mk('p6', { title: '사과 파이', tags: ['과일'] }) // 새 페이지
+    ];
+    syncIndex(index, sigs, next);
+    const full = buildIndex(next);
+    for (const q of ['사과', '배', '과일', '체리']) expect(ids(index, q)).toEqual(ids(full, q));
+    expect([...sigs.keys()].sort()).toEqual(['p1', 'p2', 'p4', 'p5', 'p6']);
+  });
+
+  it('does not re-add unchanged pages', () => {
+    const index = createIndex();
+    const sigs = new Map<string, string>();
+    syncIndex(index, sigs, base);
+    const add = vi.spyOn(index, 'add');
+    const replace = vi.spyOn(index, 'replace');
+    syncIndex(index, sigs, [...base]);
+    expect(add).not.toHaveBeenCalled();
+    expect(replace).not.toHaveBeenCalled();
   });
 });

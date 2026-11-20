@@ -51,10 +51,11 @@ export async function savePage(
     content = fetched.content;
   }
   const tombstone = [...store.tombstones.values()].find((p) => safeNormalize(p.url) === url);
+  // 되살림은 새 화신(1.5.0 A1, 확장과 같은 뜻): id만 이어받고 클립·태그·한 줄·읽음 상태는 새로 시작한다.
+  // 본문은 페이지의 것이라 새 본문이 없으면 tombstone의 본문을 이어받는다. 옛 클립을 되돌리려면 restore_pages.
   const base: Page = tombstone
-    ? { ...tombstone }
+    ? { id: tombstone.id, url, title: tombstone.title, domain: extractDomain(url), savedAt: now, updatedAt: now, rev: tombstone.rev, tags: [], clips: [], ...(tombstone.contentText !== undefined && { contentText: tombstone.contentText, ...(tombstone.contentTruncated && { contentTruncated: true }) }) }
     : { id: randomUUID(), url, title: title ?? url, domain: extractDomain(url), savedAt: now, updatedAt: now, rev: 0, tags: [], clips: [] };
-  delete base.deletedAt;
   const page: Page = {
     ...base,
     title: title ?? base.title,
@@ -62,6 +63,7 @@ export async function savePage(
   };
   if (content) {
     page.contentText = content;
+    delete page.contentTruncated; // 옛 본문의 잘림 표시는 새 본문과 무관(리뷰 M4)
     delete page.bodyPending; // 본문을 넣었으니 확장이 다시 채울 필요가 없다
   }
   if (summary) page.summary = summary;

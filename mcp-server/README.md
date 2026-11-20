@@ -154,6 +154,8 @@ Each page is one Markdown file. The frontmatter holds only the human-facing keys
 
 Do not edit that block by hand. Files written before 0.7.0 (`markpin: 1` in the frontmatter) are still read; they are rewritten in the new shape the next time anything changes them.
 
+`cards/` at the folder root holds quote-card PNGs exported by the extension (1.4.0). The server ignores that folder.
+
 ## `markpin.json` (Markdown template)
 
 The extension writes `markpin.json` at the folder root when you pick a Markdown template or turn on `.trash/` in its options. This server reads it on start and on every rescan, and renders the files it writes with the same template (`default` or `obsidian`, or a custom template string), so pages saved through MCP look like the ones saved from the browser. Only the body below the frontmatter changes; the frontmatter is always Markpin's own. Moving deleted files to `.trash/` is done by the extension, not by this server.
@@ -185,7 +187,7 @@ Write (`--allow-write`):
 
 | Tool | What it does |
 |---|---|
-| `save_page` | Saves a URL as a new page (fetches and extracts the article unless you pass `content`). Takes an optional `summary` (one or two sentences) and `tags` — the assistant is asked to supply both whenever it has read the page, since Markpin's built-in AI only runs for pages saved from the browser. One page per URL — an existing page is returned unchanged. |
+| `save_page` | Saves a URL as a new page (fetches and extracts the article unless you pass `content`). Takes an optional `summary` (one or two sentences) and `tags` — the assistant is asked to supply both whenever it has read the page, since Markpin's built-in AI only runs for pages saved from the browser. One page per URL — an existing page is returned unchanged. Re-saving a deleted page starts fresh instead of restoring its old clips (0.10.1); use `restore_pages` to bring them back. |
 | `update_tags` | Adds and/or removes tags on one or more pages. |
 | `retag` | Renames, merges or removes tags across every page in one confirmation: `changes: [{ from, to? }]`, applied in order; omit `to` to remove the tag. Matching ignores case. |
 | `batch` | Runs up to 50 write tools (any except `batch`) in order after one confirmation that lists every change. Every op is validated and planned first; one bad op rejects the whole batch. Stops at the first failure and returns each op's result plus `completed`; an op that would change nothing is not run and comes back as `skipped: true`. Ops must reference pages that already exist. |

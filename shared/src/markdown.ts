@@ -93,10 +93,16 @@ const SENTINEL = '\u0000';
 
 /** 「클립 전부 복사」(1.2.2 B6): 맨 위 `[제목](URL)` 한 줄 + 템플릿이 그린 `## Content` 앞부분. 본문은 넣지 않는다. */
 export function clipsMarkdown(page: Pick<Page, 'clips' | 'title' | 'url'> & Partial<Page>, template: string = TEMPLATE_DEFAULT): string {
-  const rendered = renderBody(page, SENTINEL, template);
+  // 영역 이미지는 내 폴더 상대 경로라 클립보드 밖에서 쓸모가 없다 — 글·메모만 남긴다(1.5.0 A4).
+  // 이미지를 떼면 글도 메모도 없는 영역 클립은 빈 블록만 남으니 뺀다(리뷰 M5).
+  const textOnly = { ...page, clips: page.clips.filter((c) => !c.image || c.text.trim() || c.note.trim()).map(({ image: _image, ...clip }) => clip) };
+  const rendered = renderBody(textOnly, SENTINEL, template);
   const cut = rendered.lastIndexOf(CONTENT_MARK + '\n' + SENTINEL);
   const clipsPart = (cut === -1 ? rendered.split(SENTINEL).join('') : rendered.slice(0, cut)).trimEnd();
-  return `[${page.title}](${page.url})\n\n${clipsPart}\n`;
+  // 템플릿이 제목으로 시작하면 머리 링크 줄을 붙이지 않는다(제목 두 번 방지).
+  const firstLine = clipsPart.split('\n', 1)[0].replace(/^#+\s*/, '').trim();
+  if (firstLine === page.title.trim()) return `${clipsPart}\n`;
+  return `[${page.title.replace(/[\\[\]]/g, '\\$&')}](${page.url})\n\n${clipsPart}\n`;
 }
 
 /**

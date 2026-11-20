@@ -46,6 +46,28 @@ describe('savePage', () => {
     expect(disk.contentText).toBe('kept body');
     expect(disk.deletedAt).toBeUndefined();
   });
+  it('reviving a tombstone starts fresh: no old clips, tags, note, reading state (1.5.0 A1)', async () => {
+    const { dir } = await makeFixture();
+    const store = await loadDir(dir);
+    const at = '2026-01-03T00:00:00.000Z';
+    const tomb = mk('f8f8f8f8-0000-4000-8000-000000000008', {
+      url: 'https://e.com/again', title: 'Again', tags: ['old'], note: '옛 한 줄', readAt: at,
+      bookmark: { createdAt: at, quote: '여기' },
+      clips: [{ id: 'c-old', type: 'text', createdAt: at, updatedAt: at, text: '옛 문장', note: '', selectors: [] }],
+      deletedAt: '2026-01-04T00:00:00.000Z'
+    });
+    await writePage(store, tomb, '2026-01-04T00:00:00.000Z');
+    const r = await savePage(store, { url: tomb.url, content: '새 본문', tags: ['new'] }, { fetchPage }, NOW);
+    expect(r).toMatchObject({ created: true, revived: true, page: { id: tomb.id } });
+    const disk = await onDisk(store, tomb.id);
+    expect(disk.clips).toEqual([]);
+    expect(disk.tags).toEqual(['new']);
+    expect(disk.note).toBeUndefined();
+    expect(disk.bookmark).toBeUndefined();
+    expect(disk.readAt).toBeUndefined();
+    expect(disk.savedAt).toBe(NOW);
+    expect(disk.contentText).toBe('새 본문');
+  });
   it('returns the existing page without writing when the url is already saved', async () => {
     const { dir, pages } = await makeFixture();
     const store = await loadDir(dir);
@@ -71,6 +93,16 @@ describe('savePage', () => {
     const disk = await onDisk(store, r.page.id);
     expect(disk.contentText).toBe('agent body');
     expect(disk.bodyPending).toBeUndefined();
+  });
+  it('new content on a truncated tombstone clears the old truncation flag (review M4)', async () => {
+    const { dir } = await makeFixture();
+    const store = await loadDir(dir);
+    const tomb = mk('f8f8f8f8-0000-4000-8000-000000000008', { url: 'https://e.com/trunc', title: 'Trunc', contentText: 'old cut', contentTruncated: true, deletedAt: '2026-01-04T00:00:00.000Z' });
+    await writePage(store, tomb, '2026-01-04T00:00:00.000Z');
+    const r = await savePage(store, { url: tomb.url, content: 'whole new body' }, { fetchPage }, NOW);
+    const disk = await onDisk(store, r.page.id);
+    expect(disk.contentText).toBe('whole new body');
+    expect(disk.contentTruncated).toBeUndefined();
   });
   it('rejects a non-http url', async () => {
     const { dir } = await makeFixture();

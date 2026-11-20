@@ -491,4 +491,26 @@ describe('clipsMarkdown (1.2.2 B6)', () => {
     expect(out).not.toContain('본문 첫 문단');
     expect(out).not.toContain('## Content');
   });
+  it('escapes brackets and backslashes in the title link', () => {
+    const out = clipsMarkdown({ ...base, title: '배열 [a] \\ 끝' });
+    expect(out.split('\n')[0]).toBe('[배열 \\[a\\] \\\\ 끝](https://example.com/article)');
+  });
+  it('drops the title link line when the template already starts with the title', () => {
+    const custom = '# {{title}}\n\n{{#clips}}- {{text}}\n{{/clips}}\n## Content\n\n{{content}}\n';
+    expect(clipsMarkdown(base, custom)).toBe('# 예시 글 제목\n\n- 인용된 문장\n');
+  });
+  it('leaves region images out of the copy (no local asset paths)', () => {
+    const region = { ...base.clips[0], id: 'r1', type: 'region' as const, text: '캡션', note: '', image: { path: 'assets/r1.webp', width: 4, height: 4 } };
+    for (const tpl of [undefined, TEMPLATE_OBSIDIAN]) {
+      const out = clipsMarkdown({ ...base, clips: [region] }, tpl);
+      expect(out).not.toContain('assets/');
+      expect(out).toContain('캡션');
+    }
+  });
+  it('drops image-only region clips (no text, no note) instead of leaving an empty block (review M5)', () => {
+    const imageOnly = { ...base.clips[0], id: 'r2', type: 'region' as const, text: '', note: '', image: { path: 'assets/r2.webp', width: 4, height: 4 } };
+    expect(clipsMarkdown({ ...base, clips: [imageOnly, base.clips[0]] })).toBe(clipsMarkdown(base));
+    expect(clipsMarkdown({ ...base, clips: [imageOnly, base.clips[0]] }, TEMPLATE_OBSIDIAN)).toBe(clipsMarkdown(base, TEMPLATE_OBSIDIAN));
+  });
+
 });

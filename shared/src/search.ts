@@ -16,15 +16,44 @@ export function toDoc(page: Page): PageDoc {
   };
 }
 
-export function buildIndex(pages: Page[]): MiniSearch<PageDoc> {
-  const index = new MiniSearch<PageDoc>({
+export function createIndex(): MiniSearch<PageDoc> {
+  return new MiniSearch<PageDoc>({
     fields: FIELDS,
     storeFields: [],
     tokenize: (text) => text.split(/[\s\p{P}]+/u).filter(Boolean),
     searchOptions: { prefix: true, boost: { title: 3, tagsText: 2 } }
   });
+}
+
+export function buildIndex(pages: Page[]): MiniSearch<PageDoc> {
+  const index = createIndex();
   index.addAll(pages.map(toDoc));
   return index;
+}
+
+/** 색인 문서가 마지막으로 반영한 페이지 판. 병합·되살림은 rev만으론 못 가를 수 있어 updatedAt을 같이 본다. */
+const signature = (page: Page) => `${page.rev}:${page.updatedAt}`;
+
+/**
+ * 색인을 `pages`에 맞춘다(사이드패널 규모 3): 없어진 id는 discard, 판이 바뀐 id는 replace, 새 id는 add.
+ * `sigs`는 색인에 든 id → 판(호출자가 들고 넘기고, 함수가 갱신). 바뀐 페이지만 다시 토큰화한다.
+ */
+export function syncIndex(index: MiniSearch<PageDoc>, sigs: Map<string, string>, pages: Page[]): void {
+  const seen = new Set<string>();
+  for (const page of pages) {
+    seen.add(page.id);
+    const sig = signature(page);
+    const prev = sigs.get(page.id);
+    if (prev === sig) continue;
+    if (prev === undefined) index.add(toDoc(page));
+    else index.replace(toDoc(page));
+    sigs.set(page.id, sig);
+  }
+  for (const id of [...sigs.keys()]) {
+    if (seen.has(id)) continue;
+    index.discard(id);
+    sigs.delete(id);
+  }
 }
 
 export type Hit = { source: 'clip' | 'content'; before: string; hit: string; after: string };
